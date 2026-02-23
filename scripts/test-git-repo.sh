@@ -17,6 +17,12 @@ echo "# Test Repository" > README.md
 git add README.md
 git commit -m "Initial commit"
 
+# Rename master to main if needed
+CURRENT_BRANCH=$(git branch --show-current)
+if [ "$CURRENT_BRANCH" = "master" ]; then
+  git branch -m master main
+fi
+
 # Create some commits on main
 echo "main content" > main.txt
 git add main.txt
@@ -66,9 +72,27 @@ echo "  - bugfix/navbar branch (1 commit)"
 echo ""
 echo "Repository location: $TEST_REPO"
 echo ""
+echo "========================================"
 echo "Starting ISL server..."
+echo "========================================"
+echo ""
+echo "IMPORTANT: WebSockets require SOCKS proxy for SSH tunneling!"
+echo ""
+echo "On your LOCAL machine, run this SSH command:"
+echo "  ssh -D 8080 jesselupica@100.85.241.138"
+echo ""
+echo "Then configure your browser to use SOCKS5 proxy:"
+echo "  Host: localhost"
+echo "  Port: 8080"
+echo ""
+echo "Firefox: Settings → Network Settings → Manual proxy → SOCKS Host: localhost, Port: 8080, SOCKS v5"
+echo "Chrome: Run with --proxy-server=\"socks5://localhost:8080\""
+echo ""
+echo "The server URL will be printed below (use it after configuring the proxy):"
+echo "========================================"
 echo ""
 
-# Start the dev server from the champagne root
-cd "$(dirname "$0")/.."
-yarn dev browser --launch "$TEST_REPO"
+# Start the dev server from the champagne root with Git driver
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/../isl-server" || exit 1
+yarn serve --dev --foreground --stdout --force --vcs-type git --cwd "$TEST_REPO"

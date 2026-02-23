@@ -540,6 +540,9 @@ export async function runProxyMain(args: Args) {
     info('re-used existing Sapling Web server');
     info('\naccess Sapling Web with this link:');
     info(String(url));
+    info('\n⚠️  Using SSH tunnel? WebSockets require SOCKS proxy!');
+    info('Run on your local machine: ssh -D 8080 jesselupica@100.85.241.138');
+    info('Configure browser SOCKS5 proxy: localhost:8080');
 
     if (json) {
       outputJson({
@@ -583,6 +586,9 @@ export async function runProxyMain(args: Args) {
     info('started a new server');
     info('\naccess Sapling Web with this link:');
     info(String(url));
+    info('\n⚠️  Using SSH tunnel? WebSockets require SOCKS proxy!');
+    info('Run on your local machine: ssh -D 8080 jesselupica@100.85.241.138');
+    info('Configure browser SOCKS5 proxy: localhost:8080');
     if (json) {
       outputJson({
         url: url.href,
