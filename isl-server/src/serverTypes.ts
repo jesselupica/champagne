@@ -20,6 +20,9 @@ export type RepositoryContext = {
   logger: Logger;
   tracker: ServerSideTracker;
 
+  /** Explicitly requested VCS type, bypassing auto-detection */
+  vcsType?: 'sapling' | 'git';
+
   knownConfigs?: ReadonlyMap<ConfigName, string> | undefined;
   /** Whether we pass --debug to sl commands */
   debug?: boolean;

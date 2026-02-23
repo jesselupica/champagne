@@ -29,6 +29,7 @@ export type StartServerArgs = {
   logFileLocation: string;
   logInfo: (...args: Parameters<typeof console.log>) => void;
   command: string;
+  vcsType?: 'sapling' | 'git';
   slVersion: string;
   foreground: boolean;
 };
@@ -51,6 +52,7 @@ export function startServer({
   logFileLocation,
   logInfo,
   command,
+  vcsType,
   slVersion,
   foreground,
 }: StartServerArgs): Promise<StartServerResult> {
@@ -225,6 +227,7 @@ export function startServer({
         cwd: cwd ?? originalProcessCwd,
         logFileLocation: logFileLocation === 'stdout' ? undefined : logFileLocation,
         command,
+        vcsType,
         version: slVersion,
 
         appMode: {mode: 'isl'},

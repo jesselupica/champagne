@@ -178,6 +178,7 @@ export default class ServerToClientAPI {
       cmd: command,
       logger: this.logger,
       tracker: this.tracker,
+      vcsType: this.connection.vcsType,
     };
     this.activeRepoRef = repositoryCache.getOrCreate(ctx);
     this.activeRepoRef.promise.then(repoOrError => {
@@ -933,39 +934,60 @@ export default class ServerToClientAPI {
       }
       case 'exportStack': {
         const {revs, assumeTracked} = data;
-        const assumeTrackedArgs = (assumeTracked ?? []).map(path => `--assume-tracked=${path}`);
-        const exec = repo.runCommand(
-          ['debugexportstack', '-r', revs, ...assumeTrackedArgs],
-          'ExportStackCommand',
-          ctx,
-          undefined,
-          /* don't timeout */ 0,
-        );
-        const reply = (stack?: ExportStack, error?: string) => {
+        if (!repo.driver.exportStack) {
           this.postMessage({
             type: 'exportedStack',
             assumeTracked: assumeTracked ?? [],
             revs,
-            stack: stack ?? [],
-            error,
+            stack: [],
+            error: 'Stack operations are not supported by this VCS driver',
           });
-        };
-        parseExecJson(exec, reply);
+          break;
+        }
+        repo.driver
+          .exportStack(ctx, revs, assumeTracked)
+          .then(stack => {
+            this.postMessage({
+              type: 'exportedStack',
+              assumeTracked: assumeTracked ?? [],
+              revs,
+              stack,
+              error: undefined,
+            });
+          })
+          .catch(err => {
+            this.postMessage({
+              type: 'exportedStack',
+              assumeTracked: assumeTracked ?? [],
+              revs,
+              stack: [],
+              error: String(err),
+            });
+          });
         break;
       }
       case 'importStack': {
-        const stdinStream = Readable.from(JSON.stringify(data.stack));
-        const exec = repo.runCommand(
-          ['debugimportstack'],
-          'ImportStackCommand',
-          ctx,
-          {stdin: stdinStream},
-          /* don't timeout */ 0,
-        );
-        const reply = (imported?: ImportedStack, error?: string) => {
-          this.postMessage({type: 'importedStack', imported: imported ?? [], error});
-        };
-        parseExecJson(exec, reply);
+        if (!repo.driver.importStack) {
+          this.postMessage({
+            type: 'importedStack',
+            imported: [],
+            error: 'Stack operations are not supported by this VCS driver',
+          });
+          break;
+        }
+        repo.driver
+          .importStack(ctx, data.stack)
+          .then(output => {
+            try {
+              const imported = JSON.parse(output) as ImportedStack;
+              this.postMessage({type: 'importedStack', imported, error: undefined});
+            } catch {
+              this.postMessage({type: 'importedStack', imported: [], error: output});
+            }
+          })
+          .catch(err => {
+            this.postMessage({type: 'importedStack', imported: [], error: String(err)});
+          });
         break;
       }
       case 'fetchQeFlag': {

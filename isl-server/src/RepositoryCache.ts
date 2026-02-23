@@ -11,6 +11,9 @@ import type {RepositoryContext} from './serverTypes';
 import {TypedEventEmitter} from 'shared/TypedEventEmitter';
 import {ensureTrailingPathSep} from 'shared/pathUtils';
 import {Repository} from './Repository';
+import {detectDriver} from './vcs/detectDriver';
+import {GitDriver} from './vcs/GitDriver';
+import {SaplingDriver} from './vcs/SaplingDriver';
 
 /**
  * Reference-counting access to a {@link Repository}, via a Promise.
@@ -105,6 +108,15 @@ class RepoMap {
   }
 }
 
+function createDriverForType(vcsType: 'sapling' | 'git') {
+  switch (vcsType) {
+    case 'sapling':
+      return new SaplingDriver();
+    case 'git':
+      return new GitDriver();
+  }
+}
+
 /**
  * Allow reusing Repository instances by storing instances by path,
  * and controlling how Repositories are created.
@@ -153,7 +165,12 @@ class RepositoryCache {
       // this would guard against querying lots of redundant paths within the same repo.
       // This is probably not necessary right now, but would be useful for a VS Code extension where we need to query
       // individual file paths to add diff gutters.
-      const repoInfo = await this.RepositoryType.getRepoInfo(ctx);
+      // Detect the VCS driver for this working directory
+      const driver = ctx.vcsType
+        ? createDriverForType(ctx.vcsType)
+        : await detectDriver(ctx);
+      // Use the driver to validate the repo and get info
+      const repoInfo = await driver.validateRepo(ctx);
       // important: there should be no `await` points after here, to ensure there is no race when reusing Repositories.
       if (repoInfo.type !== 'success') {
         // No repository found at this root, or some other error prevents the repo from being created
@@ -184,6 +201,7 @@ class RepositoryCache {
       const repo = new this.RepositoryType(
         repoInfo as ValidatedRepoInfo, // repoInfo is now guaranteed to have these root/dotdir set
         ctx,
+        driver,
       );
 
       const internalRef = new RefCounted(repo);

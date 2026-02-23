@@ -41,6 +41,8 @@ optional arguments:
   --force          Kill any existing Sapling Web server on the specified port, then start a new server.
                    Note that this will disrupt other windows still using the previous Sapling Web server.
   --command name   Set which command to run for sl commands (default: sl)
+  --vcs-type type  Set which VCS driver to use: sapling (default) or git.
+                   When set to 'git', also defaults --command to 'git'.
   --cwd dir        Sets the current working directory, allowing changing the repo.
   --sl-version v   Set version number of sl was used to spawn the server (default: '(dev)')
   --platform       Set which platform implementation to use by changing the resulting URL.
@@ -81,6 +83,7 @@ type Args = {
   force: boolean;
   slVersion: string;
   command: string;
+  vcsType: 'sapling' | 'git';
   cwd: string | undefined;
   sessionId: string | undefined;
 };
@@ -102,6 +105,7 @@ export function parseArgs(args: Array<string> = process.argv.slice(2)): Args {
   let kill = false;
   let force = false;
   let command = process.env.SL ?? 'sl';
+  let vcsType: 'sapling' | 'git' = 'sapling';
   let cwd: string | undefined = undefined;
   let slVersion = '(dev)';
   let platform: string | undefined = undefined;
@@ -151,6 +155,14 @@ export function parseArgs(args: Array<string> = process.argv.slice(2)): Args {
       }
       case '--command': {
         command = consumeArgValue(arg);
+        break;
+      }
+      case '--vcs-type': {
+        const val = consumeArgValue(arg);
+        if (val !== 'sapling' && val !== 'git') {
+          errorAndExit(`--vcs-type must be 'sapling' or 'git', got '${val}'`);
+        }
+        vcsType = val as 'sapling' | 'git';
         break;
       }
       case '--cwd': {
@@ -209,6 +221,11 @@ export function parseArgs(args: Array<string> = process.argv.slice(2)): Args {
     console.info('NOTE: setting --kill and --force is redundant');
   }
 
+  // When --vcs-type git is set and command is still the default, switch to 'git'
+  if (vcsType === 'git' && command === (process.env.SL ?? 'sl')) {
+    command = 'git';
+  }
+
   return {
     help,
     foreground,
@@ -222,6 +239,7 @@ export function parseArgs(args: Array<string> = process.argv.slice(2)): Args {
     force,
     slVersion,
     command,
+    vcsType,
     cwd,
     sessionId,
   };
@@ -345,6 +363,7 @@ export async function runProxyMain(args: Args) {
     force,
     slVersion,
     command,
+    vcsType,
     sessionId,
   } = args;
   if (help) {
@@ -452,6 +471,7 @@ export async function runProxyMain(args: Args) {
     logFileLocation,
     logInfo: info,
     command,
+    vcsType,
     slVersion,
   });
 

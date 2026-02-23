@@ -10,6 +10,7 @@ import type {Repository} from '../Repository';
 import type {Logger} from '../logger';
 import type {ServerPlatform} from '../serverPlatform';
 import type {RepositoryContext} from '../serverTypes';
+import type {VCSDriver} from '../vcs/VCSDriver';
 
 import {ensureTrailingPathSep} from 'shared/pathUtils';
 import {mockLogger} from 'shared/testUtils';
@@ -26,41 +27,81 @@ const mockTracker = makeServerSideTracker(
   jest.fn(),
 );
 
-class SimpleMockRepositoryImpl {
-  static getRepoInfo(ctx: RepositoryContext): Promise<RepoInfo> {
-    const {cwd, cmd} = ctx;
-    let data;
-    if (cwd.includes('/path/to/repo')) {
-      data = {
-        repoRoot: '/path/to/repo',
-        dotdir: '/path/to/repo/.sl',
-      };
-    } else if (cwd.includes('/path/to/anotherrepo')) {
-      data = {
-        repoRoot: '/path/to/anotherrepo',
-        dotdir: '/path/to/anotherrepo/.sl',
-      };
-    } else if (cwd.includes('/path/to/submodule')) {
-      data = {
-        repoRoot: cwd.endsWith('/cwd') ? cwd.slice(0, -4) : cwd,
-        dotdir: ensureTrailingPathSep(cwd) + '.sl',
-      };
-    } else {
-      return Promise.resolve({type: 'cwdNotARepository', cwd} as RepositoryError);
-    }
-    return Promise.resolve({
-      type: 'success',
-      command: cmd,
-      pullRequestDomain: undefined,
-      preferredSubmitCommand: 'pr',
-      codeReviewSystem: {type: 'unknown'},
-      isEdenFs: false,
-      ...data,
-    });
+function repoInfoForCwd(cwd: string, cmd: string): RepoInfo {
+  let data;
+  if (cwd.includes('/path/to/repo')) {
+    data = {
+      repoRoot: '/path/to/repo',
+      dotdir: '/path/to/repo/.sl',
+    };
+  } else if (cwd.includes('/path/to/anotherrepo')) {
+    data = {
+      repoRoot: '/path/to/anotherrepo',
+      dotdir: '/path/to/anotherrepo/.sl',
+    };
+  } else if (cwd.includes('/path/to/submodule')) {
+    data = {
+      repoRoot: cwd.endsWith('/cwd') ? cwd.slice(0, -4) : cwd,
+      dotdir: ensureTrailingPathSep(cwd) + '.sl',
+    };
+  } else {
+    return {type: 'cwdNotARepository', cwd} as RepositoryError;
   }
+  return {
+    type: 'success',
+    command: cmd,
+    pullRequestDomain: undefined,
+    preferredSubmitCommand: 'pr',
+    codeReviewSystem: {type: 'unknown'},
+    isEdenFs: false,
+    ...data,
+  };
+}
+
+/** Create a mock driver that resolves validateRepo based on cwd */
+function createMockDriver(ctx: RepositoryContext): VCSDriver {
+  return {
+    name: 'MockVCS',
+    command: 'mock',
+    capabilities: {} as any,
+    validateRepo: () => Promise.resolve(repoInfoForCwd(ctx.cwd, ctx.cmd)),
+    findRoot: jest.fn(),
+    findRoots: jest.fn(),
+    findDotDir: jest.fn(),
+    fetchCommits: jest.fn(),
+    fetchStatus: jest.fn(),
+    checkMergeConflicts: jest.fn(),
+    lookupCommits: jest.fn(),
+    getFileContents: jest.fn(),
+    getBlame: jest.fn(),
+    getDiff: jest.fn(),
+    getChangedFiles: jest.fn(),
+    getShelvedChanges: jest.fn(),
+    getDiffStats: jest.fn(),
+    getPendingDiffStats: jest.fn(),
+    getPendingAmendDiffStats: jest.fn(),
+    getConfig: jest.fn(),
+    getConfigs: jest.fn(),
+    setConfig: jest.fn(),
+    runCommand: jest.fn(),
+    normalizeOperationArgs: jest.fn(),
+    getExecParams: jest.fn(),
+    getMergeTool: jest.fn(),
+    getMergeToolEnvVars: jest.fn(),
+    getWatchConfig: jest.fn(),
+  } as unknown as VCSDriver;
+}
+
+// Mock detectDriver to return our mock driver
+jest.mock('../vcs/detectDriver', () => ({
+  detectDriver: (ctx: RepositoryContext) => Promise.resolve(createMockDriver(ctx)),
+}));
+
+class SimpleMockRepositoryImpl {
   constructor(
     public info: RepoInfo,
     public logger: Logger,
+    public driver?: VCSDriver,
   ) {}
 
   dispose = jest.fn();
@@ -261,23 +302,30 @@ describe('RepositoryCache', () => {
       isEdenFs: false,
     } as RepoInfo;
 
-    // two different fake async fetches for RepoInfo
+    // two different fake async fetches for driver.validateRepo
     const p1 = defer<RepoInfo>();
     const p2 = defer<RepoInfo>();
 
+    let callCount = 0;
+    // Override the module-level mock to return drivers with deferred validateRepo
+    const detectDriverModule = require('../vcs/detectDriver');
+    const origDetectDriver = detectDriverModule.detectDriver;
+    detectDriverModule.detectDriver = (_ctx: RepositoryContext) => {
+      callCount++;
+      const myDefer = callCount === 1 ? p1 : p2;
+      return Promise.resolve({
+        name: 'MockVCS',
+        command: 'mock',
+        capabilities: {} as any,
+        validateRepo: () => myDefer.promise,
+      } as unknown as VCSDriver);
+    };
+
     class BlockingMockRepository {
-      static getRepoInfo(ctx: RepositoryContext): Promise<RepoInfo> {
-        const {cwd} = ctx;
-        if (cwd === '/path/to/repo/cwd1') {
-          return p1.promise;
-        } else if (cwd === '/path/to/repo/cwd2') {
-          return p2.promise;
-        }
-        throw new Error('unknown repo');
-      }
       constructor(
         public info: RepoInfo,
         public logger: Logger,
+        public driver?: VCSDriver,
       ) {}
 
       dispose = jest.fn();
@@ -299,6 +347,9 @@ describe('RepositoryCache', () => {
 
     ref1.unref();
     ref2.unref();
+
+    // Restore original mock
+    detectDriverModule.detectDriver = origDetectDriver;
   });
 });
 
@@ -307,16 +358,16 @@ describe('RepoMap', () => {
     const repoNum = 10;
     const repoRoots = [];
     const promises = [];
-    const createRefCountedRepo = async (ctx: RepositoryContext) => {
-      const repoInfo = await SimpleMockRepository.getRepoInfo(ctx);
-      const repo = new SimpleMockRepository(repoInfo as ValidatedRepoInfo, ctx);
+    const createRefCountedRepo = (cwd: string) => {
+      const info = repoInfoForCwd(cwd, 'sl');
+      const repo = new SimpleMockRepository(info as ValidatedRepoInfo, ctx as any, {} as any);
       return new RefCounted(repo);
     };
     for (let i = 0; i < repoNum; i++) {
       repoRoots.push(`/path/to/submodule${i}`);
-      promises.push(createRefCountedRepo({...ctx, cwd: `/path/to/submodule${i}`}));
+      promises.push(createRefCountedRepo(`/path/to/submodule${i}`));
     }
-    const repos = await Promise.all(promises);
+    const repos = promises;
 
     const repoMap = new RepoMap();
     for (let i = 0; i < repoNum; i++) {
@@ -335,18 +386,15 @@ describe('RepoMap', () => {
     repoMap.forEach(repo => expect(repo.getNumberOfReferences()).toBe(0));
   });
 
-  it('longest prefix match', async () => {
-    const createRefCountedRepo = async (ctx: RepositoryContext) => {
-      const repoInfo = await SimpleMockRepository.getRepoInfo(ctx);
-      const repo = new SimpleMockRepository(repoInfo as ValidatedRepoInfo, ctx);
+  it('longest prefix match', () => {
+    const createRefCountedRepo = (cwd: string) => {
+      const info = repoInfoForCwd(cwd, 'sl');
+      const repo = new SimpleMockRepository(info as ValidatedRepoInfo, ctx as any, {} as any);
       return new RefCounted(repo);
     };
-    const a = await createRefCountedRepo({...ctx, cwd: '/path/to/submoduleA/cwd'});
-    const b = await createRefCountedRepo({...ctx, cwd: '/path/to/submoduleB/cwd'});
-    const nested = await createRefCountedRepo({
-      ...ctx,
-      cwd: '/path/to/submoduleA/submoduleNested/cwd',
-    });
+    const a = createRefCountedRepo('/path/to/submoduleA/cwd');
+    const b = createRefCountedRepo('/path/to/submoduleB/cwd');
+    const nested = createRefCountedRepo('/path/to/submoduleA/submoduleNested/cwd');
 
     const repoMap = new RepoMap();
     // A raw map would iterate in insertion order, so we

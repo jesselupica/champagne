@@ -1,6 +1,8 @@
 # Champagne
 
-A standalone fork of Interactive Smartlog (ISL) from the Sapling SCM project.
+A universal VCS GUI - bringing ISL's excellent interface to any version control system.
+
+Champagne is a fork of Interactive Smartlog (ISL) from Sapling SCM, refactored to support multiple version control systems through a pluggable driver architecture.
 
 ## Quick Start
 

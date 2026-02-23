@@ -39,6 +39,11 @@ export interface ClientConnection {
    */
   command?: string;
   /**
+   * Explicitly requested VCS type, bypassing auto-detection.
+   * When set, uses the corresponding driver directly.
+   */
+  vcsType?: 'sapling' | 'git';
+  /**
    * Platform-specific version string.
    * For `sl web`, this is the `sl` version.
    * For the VS Code extension, this is the extension version.

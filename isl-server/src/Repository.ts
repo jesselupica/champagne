@@ -43,6 +43,7 @@ import type {KindOfChange, PollKind} from './WatchForChanges';
 import type {TrackEventName} from './analytics/eventNames';
 import type {ConfigLevel, ResolveCommandConflictOutput} from './commands';
 import type {RepositoryContext} from './serverTypes';
+import type {VCSDriver} from './vcs/VCSDriver';
 
 import {Set as ImSet} from 'immutable';
 import {
@@ -143,6 +144,9 @@ export class Repository {
   private pageFocusTracker = new PageFocusTracker();
   public codeReviewProvider?: CodeReviewProvider;
 
+  /** The VCS driver for this repository (e.g., Sapling, Git). */
+  public driver: VCSDriver;
+
   /**
    * Config: milliseconds to hold off log/status refresh during the start of a command.
    * This is to avoid showing messy indeterminate states (like millions of files changed
@@ -191,7 +195,9 @@ export class Repository {
   constructor(
     public info: ValidatedRepoInfo,
     ctx: RepositoryContext,
+    driver: VCSDriver,
   ) {
+    this.driver = driver;
     this.initialConnectionContext = ctx;
 
     const remote = info.codeReviewSystem;
@@ -403,7 +409,6 @@ export class Repository {
     if (!wasAlreadyInConflicts) {
       const mergeDirExists = await exists(path.join(this.info.dotdir, 'merge'));
       if (!mergeDirExists) {
-        // Not in a conflict
         this.initialConnectionContext.logger.info(
           `conflict state still the same (${
             wasAlreadyInConflicts ? 'IN merge conflict' : 'NOT in conflict'
@@ -419,29 +424,17 @@ export class Repository {
       this.mergeConflictsEmitter.emit('change', this.mergeConflicts);
     }
 
-    // More expensive full check for conflicts. Necessary if we see .sl/merge change, or if
-    // we're already in a conflict and need to re-check if a conflict was resolved.
-
-    let output: ResolveCommandConflictOutput;
-    const fetchStartTimestamp = Date.now();
     try {
-      // TODO: is this command fast on large files? it includes full conflicting file contents!
-      // `sl resolve --list --all` does not seem to give any way to disambiguate (all conflicts resolved) and (not in merge)
-      const proc = await this.runCommand(
-        ['resolve', '--tool', 'internal:dumpjson', '--all'],
-        'GetConflictsCommand',
+      this.mergeConflicts = await this.driver.checkMergeConflicts(
         this.initialConnectionContext,
+        this.mergeConflicts,
       );
-      output = JSON.parse(proc.stdout) as ResolveCommandConflictOutput;
     } catch (err) {
       this.initialConnectionContext.logger.error(`failed to check for merge conflicts: ${err}`);
-      // To avoid being stuck in "loading" state forever, let's pretend there's no conflicts.
       this.mergeConflicts = undefined;
       this.mergeConflictsEmitter.emit('change', this.mergeConflicts);
       return;
     }
-
-    this.mergeConflicts = computeNewConflicts(this.mergeConflicts, output, fetchStartTimestamp);
     this.initialConnectionContext.logger.info(
       `repo ${this.mergeConflicts ? 'IS' : 'IS NOT'} in merge conflicts`,
     );
@@ -472,40 +465,7 @@ export class Repository {
   }
 
   public async getMergeTool(ctx: RepositoryContext): Promise<string | null> {
-    // treat undefined as "not cached", and null as "not configured"/invalid
-    if (ctx.cachedMergeTool !== undefined) {
-      return ctx.cachedMergeTool;
-    }
-    const tool = ctx.knownConfigs?.get('ui.merge') ?? 'internal:merge';
-    let usesCustomMerge = tool !== 'internal:merge';
-
-    if (usesCustomMerge) {
-      // TODO: we could also check merge-tools.${tool}.disabled here
-      const customToolUsesGui =
-        (
-          await this.forceGetConfig(ctx, `merge-tools.${tool}.gui`).catch(() => undefined)
-        )?.toLowerCase() === 'true';
-      if (!customToolUsesGui) {
-        ctx.logger.warn(
-          `configured custom merge tool '${tool}' is not a GUI tool, using :merge3 instead`,
-        );
-        usesCustomMerge = false;
-      } else {
-        ctx.logger.info(`using configured custom GUI merge tool ${tool}`);
-      }
-      ctx.tracker.track('UsingExternalMergeTool', {
-        extras: {
-          tool,
-          isValid: usesCustomMerge,
-        },
-      });
-    } else {
-      ctx.logger.info(`using default :merge3 merge tool`);
-    }
-
-    const mergeTool = usesCustomMerge ? tool : null;
-    ctx.cachedMergeTool = mergeTool;
-    return mergeTool;
+    return this.driver.getMergeTool(ctx);
   }
 
   /**
@@ -656,55 +616,9 @@ export class Repository {
   private normalizeOperationArgs(
     cwd: string,
     operation: RunnableOperation,
-  ): {args: Array<string>; stdin?: string | undefined} {
+  ): {args: Array<string>; stdin?: string | undefined; env?: Record<string, string>} {
     const repoRoot = nullthrows(this.info.repoRoot);
-    const illegalArgs = new Set(['--cwd', '--config', '--insecure', '--repository', '-R']);
-    let stdin = operation.stdin;
-    const args = [];
-    for (const arg of operation.args) {
-      if (typeof arg === 'object') {
-        switch (arg.type) {
-          case 'config':
-            if (!(settableConfigNames as ReadonlyArray<string>).includes(arg.key)) {
-              throw new Error(`config ${arg.key} not allowed`);
-            }
-            args.push('--config', `${arg.key}=${arg.value}`);
-            continue;
-          case 'repo-relative-file':
-            args.push(path.normalize(path.relative(cwd, path.join(repoRoot, arg.path))));
-            continue;
-          case 'repo-relative-file-list':
-            // pass long lists of files as stdin via fileset patterns
-            // this is passed as an arg instead of directly in stdin so that we can do path normalization
-            args.push('listfile0:-');
-            if (stdin != null) {
-              throw new Error('stdin already set when using repo-relative-file-list');
-            }
-            stdin = arg.paths
-              .map(p => path.normalize(path.relative(cwd, path.join(repoRoot, p))))
-              .join('\0');
-            continue;
-          case 'exact-revset':
-            if (arg.revset.startsWith('-')) {
-              // don't allow revsets to be used as flags
-              throw new Error('invalid revset');
-            }
-            args.push(arg.revset);
-            continue;
-          case 'succeedable-revset':
-            args.push(`max(successors(${arg.revset}))`);
-            continue;
-          case 'optimistic-revset':
-            args.push(`max(successors(${arg.revset}))`);
-            continue;
-        }
-      }
-      if (illegalArgs.has(arg)) {
-        throw new Error(`argument '${arg}' is not allowed`);
-      }
-      args.push(arg);
-    }
-    return {args, stdin};
+    return this.driver.normalizeOperationArgs(cwd, repoRoot, operation);
   }
 
   private async operationIPC(
@@ -766,11 +680,12 @@ export class Repository {
     signal: AbortSignal,
   ): Promise<void> {
     const {cwd} = ctx;
-    const {args: cwdRelativeArgs, stdin} = this.normalizeOperationArgs(cwd, operation);
+    const resolved = this.normalizeOperationArgs(cwd, operation);
+    const {args: cwdRelativeArgs, stdin} = resolved;
 
     const env = await Promise.all([
       Internal.additionalEnvForCommand?.(operation),
-      this.getMergeToolEnvVars(ctx),
+      this.driver.getMergeToolEnvVars(ctx),
     ]);
 
     const ipc = (ctx.knownConfigs?.get('isl.sl-progress-enabled') ?? 'false') === 'true';
@@ -781,14 +696,14 @@ export class Repository {
     if (ctx.verbose) {
       fullArgs.unshift('--verbose');
     }
-    const {command, args, options} = getExecParams(
-      this.info.command,
+    const {command, args, options} = this.driver.getExecParams(
       fullArgs,
       cwd,
       stdin ? {input: stdin, ipc} : {ipc},
       {
         ...env[0],
         ...env[1],
+        ...resolved.env,
       },
     );
 
@@ -826,20 +741,10 @@ export class Repository {
 
   /**
    * Get environment variables to set up which merge tool to use during an operation.
-   * If you're using the default merge tool, use :merge3 instead for slightly better merge information.
-   * If you've configured a custom merge tool, make sure we don't overwrite it...
-   * ...unless the custom merge tool is *not* a GUI tool, like vimdiff, which would not be interactable in ISL.
+   * Delegates to the VCS driver.
    */
   async getMergeToolEnvVars(ctx: RepositoryContext): Promise<Record<string, string> | undefined> {
-    const tool = await this.getMergeTool(ctx);
-    return tool != null
-      ? // allow sl to use the already configured merge tool
-        {}
-      : // otherwise, use 3-way merge
-        {
-          HGMERGE: ':merge3',
-          SL_MERGE: ':merge3',
-        };
+    return this.driver.getMergeToolEnvVars(ctx);
   }
 
   setPageFocus(page: string, state: PageVisibility) {
@@ -881,16 +786,7 @@ export class Repository {
     const fetchStartTimestamp = Date.now();
     try {
       this.uncommittedChangesBeginFetchingEmitter.emit('start');
-      // Note `status -tjson` run with PLAIN are repo-relative
-      const proc = await this.runCommand(
-        ['status', '-Tjson', '--copies'],
-        'StatusCommand',
-        this.initialConnectionContext,
-      );
-      const files = (JSON.parse(proc.stdout) as UncommittedChanges).map(change => ({
-        ...change,
-        path: removeLeadingPathSep(change.path),
-      }));
+      const files = await this.driver.fetchStatus(this.initialConnectionContext);
 
       this.uncommittedChanges = {
         fetchStartTimestamp,
@@ -973,42 +869,19 @@ export class Repository {
 
       const visibleCommitDayRange = this.visibleCommitRanges[this.currentVisibleCommitRangeIndex];
 
-      const primaryRevset = '(interestingbookmarks() + heads(draft()))';
-
-      // Revset to fetch for commits, e.g.:
-      // smartlog(interestingbookmarks() + heads(draft()) + .)
-      // smartlog((interestingbookmarks() + heads(draft()) & date(-14)) + .)
-      // smartlog((interestingbookmarks() + heads(draft()) & date(-14)) + . + present(a1b2c3d4))
-      const revset = `smartlog(${[
-        !visibleCommitDayRange
-          ? primaryRevset
-          : // filter default smartlog query by date range
-            `(${primaryRevset} & date(-${visibleCommitDayRange}))`,
-        '.', // always include wdir parent
-        // stable locations hashes may be newer than the repo has, wrap in `present()` to only include if available.
-        ...this.stableLocations.map(location => `present(${location.hash})`),
-        ...(this.recommendedBookmarks ?? []).map(bookmark => `present(${bookmark})`),
-        ...(this.fullRepoBranchModule?.genRevset() ?? []),
-      ]
-        .filter(notEmpty)
-        .join(' + ')})`;
-
-      const template = getMainFetchTemplate(this.info.codeReviewSystem);
-
-      const proc = await this.runCommand(
-        ['log', '--template', template, '--rev', revset],
-        'LogCommand',
+      const commits = await this.driver.fetchCommits(
         this.initialConnectionContext,
-      );
-      const commits = parseCommitInfoOutput(
-        this.initialConnectionContext.logger,
-        proc.stdout.trim(),
         this.info.codeReviewSystem,
+        {
+          maxDraftDays: visibleCommitDayRange,
+          stableLocations: this.stableLocations,
+          recommendedBookmarks: this.recommendedBookmarks ?? [],
+          additionalRevsetFragments: this.fullRepoBranchModule?.genRevset() ?? [],
+        },
       );
       if (commits.length === 0) {
         throw new Error(ErrorShortMessages.NoCommitsFetched);
       }
-      attachStableLocations(commits, this.stableLocations);
 
       if (this.fullRepoBranchModule) {
         this.fullRepoBranchModule.populateSmartlogCommits(commits);
@@ -1171,33 +1044,12 @@ export class Repository {
   }
 
   async fetchSubmoduleMap(): Promise<void> {
-    if (this.info.repoRoots == null) {
+    if (this.info.repoRoots == null || !this.driver.fetchSubmodules) {
       return;
     }
-    const submoduleMap = new Map();
-    await Promise.all(
-      this.info.repoRoots?.map(async root => {
-        try {
-          const proc = await this.runCommand(
-            ['debuggitmodules', '--json', '--repo', root],
-            'LogCommand',
-            this.initialConnectionContext,
-          );
-          const submodules = JSON.parse(proc.stdout) as Submodule[];
-          submoduleMap.set(root, {value: submodules?.length === 0 ? undefined : submodules});
-        } catch (err) {
-          let error = err;
-          if (isEjecaError(error)) {
-            // debuggitmodules may not be supported by older versions of Sapling
-            error = error.stderr.includes('unknown command')
-              ? Error('debuggitmodules command is not supported by your sapling version.')
-              : simplifyEjecaError(error);
-          }
-          this.initialConnectionContext.logger.error('Error fetching submodules: ', error);
-
-          submoduleMap.set(root, {error: new Error(err as string)});
-        }
-      }),
+    const submoduleMap = await this.driver.fetchSubmodules(
+      this.initialConnectionContext,
+      this.info.repoRoots,
     );
 
     this.submodulesByRoot = submoduleMap;
@@ -1211,10 +1063,7 @@ export class Repository {
   /** Return file content at a given revset, e.g. hash or `.` */
   public cat(ctx: RepositoryContext, file: AbsolutePath, rev: Revset): Promise<string> {
     return this.catLimiter.enqueueRun(async () => {
-      // For `sl cat`, we want the output of the command verbatim.
-      const options = {stripFinalNewline: false};
-      return (await this.runCommand(['cat', file, '--rev', rev], 'CatCommand', ctx, options))
-        .stdout;
+      return this.driver.getFileContents(ctx, file, rev);
     });
   }
 
@@ -1229,28 +1078,18 @@ export class Repository {
     hash: string,
   ): Promise<Array<[line: string, info: CommitInfo | undefined]>> {
     const t1 = Date.now();
-    const output = await this.runCommand(
-      ['blame', filePath, '-Tjson', '--change', '--rev', hash],
-      'BlameCommand',
-      ctx,
-      undefined,
-      /* don't timeout */ 0,
-    );
-    const blame = JSON.parse(output.stdout) as Array<{lines: Array<{line: string; node: string}>}>;
+    const blameLines = await this.driver.getBlame(ctx, filePath, hash);
     const t2 = Date.now();
 
-    if (blame.length === 0) {
+    if (blameLines.length === 0) {
       // no blame for file, perhaps it was added or untracked
       return [];
     }
 
     const hashes = new Set<string>();
-    for (const line of blame[0].lines) {
-      hashes.add(line.node);
+    for (const blameLine of blameLines) {
+      hashes.add(blameLine.node);
     }
-    // We don't get all the info we need from the  blame command, so we run `sl log` on the hashes.
-    // TODO: we could make the blame command return this directly, which is probably faster.
-    // TODO: We don't actually need all the fields in FETCH_TEMPLATE for blame. Reducing this template may speed it up as well.
     const commits = await this.lookupCommits(ctx, [...hashes]);
     const t3 = Date.now();
     ctx.logger.info(
@@ -1258,109 +1097,14 @@ export class Repository {
         (t3 - t2) / 1000
       }s`,
     );
-    return blame[0].lines.map(({node, line}) => [line, commits.get(node)]);
+    return blameLines.map(({node, line}) => [line, commits.get(node)]);
   }
 
   public async getCommitCloudState(ctx: RepositoryContext): Promise<CommitCloudSyncState> {
-    const lastChecked = new Date();
-
-    const [extension, backupStatuses, cloudStatus] = await Promise.allSettled([
-      this.forceGetConfig(ctx, 'extensions.commitcloud'),
-      this.fetchCommitCloudBackupStatuses(ctx),
-      this.fetchCommitCloudStatus(ctx),
-    ]);
-    if (extension.status === 'fulfilled' && extension.value !== '') {
-      return {
-        lastChecked,
-        isDisabled: true,
-      };
+    if (this.driver.getCommitCloudState) {
+      return this.driver.getCommitCloudState(ctx);
     }
-
-    if (backupStatuses.status === 'rejected') {
-      return {
-        lastChecked,
-        syncError: backupStatuses.reason,
-      };
-    } else if (cloudStatus.status === 'rejected') {
-      return {
-        lastChecked,
-        workspaceError: cloudStatus.reason,
-      };
-    }
-
-    return {
-      lastChecked,
-      ...cloudStatus.value,
-      commitStatuses: backupStatuses.value,
-    };
-  }
-
-  private async fetchCommitCloudBackupStatuses(
-    ctx: RepositoryContext,
-  ): Promise<Map<Hash, CommitCloudBackupStatus>> {
-    const revset = 'draft() - backedup()';
-    const commitCloudBackupStatusTemplate = `{dict(
-      hash="{node}",
-      backingup="{backingup}",
-      date="{date|isodatesec}"
-      )|json}\n`;
-
-    const output = await this.runCommand(
-      ['log', '--rev', revset, '--template', commitCloudBackupStatusTemplate],
-      'CommitCloudSyncBackupStatusCommand',
-      ctx,
-    );
-
-    const rawObjects = output.stdout.trim().split('\n');
-    const parsedObjects = rawObjects
-      .map(rawObject => {
-        try {
-          return JSON.parse(rawObject) as {hash: Hash; backingup: 'True' | 'False'; date: string};
-        } catch (err) {
-          return null;
-        }
-      })
-      .filter(notEmpty);
-
-    const now = new Date();
-    const TEN_MIN = 10 * 60 * 1000;
-    const statuses = new Map<Hash, CommitCloudBackupStatus>(
-      parsedObjects.map(obj => [
-        obj.hash,
-        obj.backingup === 'True'
-          ? CommitCloudBackupStatus.InProgress
-          : now.valueOf() - new Date(obj.date).valueOf() < TEN_MIN
-            ? CommitCloudBackupStatus.Pending
-            : CommitCloudBackupStatus.Failed,
-      ]),
-    );
-    return statuses;
-  }
-
-  private async fetchCommitCloudStatus(ctx: RepositoryContext): Promise<{
-    lastBackup: Date | undefined;
-    currentWorkspace: string;
-    workspaceChoices: Array<string>;
-  }> {
-    const [cloudStatusOutput, cloudListOutput] = await Promise.all([
-      this.runCommand(['cloud', 'status'], 'CommitCloudStatusCommand', ctx),
-      this.runCommand(['cloud', 'list'], 'CommitCloudListCommand', ctx),
-    ]);
-
-    const currentWorkspace =
-      /Workspace: ([a-zA-Z/0-9._-]+)/.exec(cloudStatusOutput.stdout)?.[1] ?? 'default';
-    const lastSyncTimeStr = /Last Sync Time: (.*)/.exec(cloudStatusOutput.stdout)?.[1];
-    const lastBackup = lastSyncTimeStr != null ? new Date(lastSyncTimeStr) : undefined;
-    const workspaceChoices = cloudListOutput.stdout
-      .split('\n')
-      .map(line => /^ {8}([a-zA-Z/0-9._-]+)(?: \(connected\))?/.exec(line)?.[1] as string)
-      .filter(l => l != null);
-
-    return {
-      lastBackup,
-      currentWorkspace,
-      workspaceChoices,
-    };
+    return {lastChecked: new Date(), isDisabled: true};
   }
 
   private commitCache = new LRU<string, CommitInfo>(100); // TODO: normal commits fetched from smartlog() aren't put in this cache---this is mostly for blame right now.
@@ -1373,23 +1117,7 @@ export class Repository {
     const commits =
       hashesToFetch.length === 0
         ? [] // don't bother running log
-        : await this.runCommand(
-            [
-              'log',
-              '--template',
-              getMainFetchTemplate(this.info.codeReviewSystem),
-              '--rev',
-              hashesToFetch.join('+'),
-            ],
-            'LookupCommitsCommand',
-            ctx,
-          ).then(output => {
-            return parseCommitInfoOutput(
-              ctx.logger,
-              output.stdout.trim(),
-              this.info.codeReviewSystem,
-            );
-          });
+        : await this.driver.lookupCommits(ctx, this.info.codeReviewSystem, hashesToFetch);
 
     const result = new Map();
     for (const hash of hashes) {
@@ -1414,22 +1142,11 @@ export class Repository {
     hash: Hash,
     excludedFiles: string[],
   ): Promise<number | undefined> {
-    const exclusions = excludedFiles.flatMap(file => [
-      '-X',
+    const resolvedExcludes = excludedFiles.map(file =>
       absolutePathForFileInRepo(file, this) ?? file,
-    ]);
-
-    const output = (
-      await this.runCommand(
-        ['diff', '--stat', '-B', '-X', '**__generated__**', ...exclusions, '-c', hash],
-        'SlocCommand',
-        ctx,
-      )
-    ).stdout;
-
-    const sloc = this.parseSlocFrom(output);
-
-    ctx.logger.info('Fetched SLOC for commit:', hash, output, `SLOC: ${sloc}`);
+    );
+    const sloc = await this.driver.getDiffStats(ctx, hash, resolvedExcludes);
+    ctx.logger.info('Fetched SLOC for commit:', hash, `SLOC: ${sloc}`);
     return sloc;
   }
 
@@ -1441,26 +1158,11 @@ export class Repository {
     if (includedFiles.length === 0) {
       return undefined;
     }
-    const inclusions = includedFiles.flatMap(file => [
-      '-I',
+    const resolvedIncludes = includedFiles.map(file =>
       absolutePathForFileInRepo(file, this) ?? file,
-    ]);
-
-    const output = (
-      await this.runCommand(
-        ['diff', '--stat', '-B', '-X', '**__generated__**', ...inclusions, '-r', '.^'],
-        'PendingSlocCommand',
-        ctx,
-      )
-    ).stdout;
-
-    if (output.trim() === '') {
-      return undefined;
-    }
-
-    const sloc = this.parseSlocFrom(output);
-
-    ctx.logger.info('Fetched Pending AMEND SLOC for commit:', hash, output, `SLOC: ${sloc}`);
+    );
+    const sloc = await this.driver.getPendingAmendDiffStats(ctx, resolvedIncludes);
+    ctx.logger.info('Fetched Pending AMEND SLOC for commit:', hash, `SLOC: ${sloc}`);
     return sloc;
   }
 
@@ -1470,35 +1172,13 @@ export class Repository {
     includedFiles: string[],
   ): Promise<number | undefined> {
     if (includedFiles.length === 0) {
-      return undefined; // don't bother running sl diff if there are no files to include
+      return undefined;
     }
-    const inclusions = includedFiles.flatMap(file => [
-      '-I',
+    const resolvedIncludes = includedFiles.map(file =>
       absolutePathForFileInRepo(file, this) ?? file,
-    ]);
-
-    const output = (
-      await this.runCommand(
-        ['diff', '--stat', '-B', '-X', '**__generated__**', ...inclusions],
-        'PendingSlocCommand',
-        ctx,
-      )
-    ).stdout;
-
-    const sloc = this.parseSlocFrom(output);
-
-    ctx.logger.info('Fetched Pending SLOC for commit:', hash, output, `SLOC: ${sloc}`);
-    return sloc;
-  }
-
-  private parseSlocFrom(output: string) {
-    const lines = output.trim().split('\n');
-    const changes = lines[lines.length - 1];
-    const diffStatRe = /\d+ files changed, (\d+) insertions\(\+\), (\d+) deletions\(-\)/;
-    const diffStatMatch = changes.match(diffStatRe);
-    const insertions = parseInt(diffStatMatch?.[1] ?? '0', 10);
-    const deletions = parseInt(diffStatMatch?.[2] ?? '0', 10);
-    const sloc = insertions + deletions;
+    );
+    const sloc = await this.driver.getPendingDiffStats(ctx, resolvedIncludes);
+    ctx.logger.info('Fetched Pending SLOC for commit:', hash, `SLOC: ${sloc}`);
     return sloc;
   }
 
@@ -1529,52 +1209,11 @@ export class Repository {
   }
 
   public async getAllChangedFiles(ctx: RepositoryContext, hash: Hash): Promise<Array<ChangedFile>> {
-    const output = (
-      await this.runCommand(
-        ['log', '--template', CHANGED_FILES_TEMPLATE, '--rev', hash],
-        'LookupAllCommitChangedFilesCommand',
-        ctx,
-      )
-    ).stdout;
-
-    const [chunk] = output.split(COMMIT_END_MARK, 1);
-
-    const lines = chunk.trim().split('\n');
-    if (lines.length < Object.keys(CHANGED_FILES_FIELDS).length) {
-      return [];
-    }
-
-    const files: Array<ChangedFile> = [
-      ...(JSON.parse(lines[CHANGED_FILES_INDEX.filesModified]) as Array<string>).map(path => ({
-        path,
-        status: 'M' as const,
-      })),
-      ...(JSON.parse(lines[CHANGED_FILES_INDEX.filesAdded]) as Array<string>).map(path => ({
-        path,
-        status: 'A' as const,
-      })),
-      ...(JSON.parse(lines[CHANGED_FILES_INDEX.filesRemoved]) as Array<string>).map(path => ({
-        path,
-        status: 'R' as const,
-      })),
-    ];
-
-    return files;
+    return this.driver.getChangedFiles(ctx, hash);
   }
 
   public async getShelvedChanges(ctx: RepositoryContext): Promise<Array<ShelvedChange>> {
-    const output = (
-      await this.runCommand(
-        ['log', '--rev', 'shelved()', '--template', SHELVE_FETCH_TEMPLATE],
-        'GetShelvesCommand',
-        ctx,
-      )
-    ).stdout;
-
-    const shelves = parseShelvedCommitsOutput(ctx.logger, output.trim());
-    // sort by date ascending
-    shelves.sort((a, b) => b.date.getTime() - a.date.getTime());
-    return shelves;
+    return this.driver.getShelvedChanges(ctx);
   }
 
   public getAllDiffIds(): Array<DiffId> {
@@ -1586,29 +1225,17 @@ export class Repository {
   }
 
   public async getActiveAlerts(ctx: RepositoryContext): Promise<Array<Alert>> {
-    const result = await this.runCommand(['config', '-Tjson', 'alerts'], 'GetAlertsCommand', ctx, {
-      reject: false,
-    });
-    if (result.exitCode !== 0 || !result.stdout) {
-      return [];
+    if (this.driver.getActiveAlerts) {
+      return this.driver.getActiveAlerts(ctx);
     }
-    try {
-      const configs = JSON.parse(result.stdout) as [{name: string; value: unknown}];
-      const alerts = parseAlerts(configs);
-      ctx.logger.info('Found active alerts:', alerts);
-      return alerts;
-    } catch (e) {
-      return [];
-    }
+    return [];
   }
 
   public async getRagePaste(ctx: RepositoryContext): Promise<string> {
-    const output = await this.runCommand(['rage'], 'RageCommand', ctx, undefined, 90_000);
-    const match = /P\d{9,}/.exec(output.stdout);
-    if (match) {
-      return match[0];
+    if (this.driver.collectDebugInfo) {
+      return this.driver.collectDebugInfo(ctx);
     }
-    throw new Error('No paste found in rage output: ' + output.stdout);
+    throw new Error('Debug info collection is not supported by this VCS driver');
   }
 
   public async runDiff(
@@ -1616,21 +1243,7 @@ export class Repository {
     comparison: Comparison,
     contextLines = 4,
   ): Promise<string> {
-    const output = await this.runCommand(
-      [
-        'diff',
-        ...revsetArgsForComparison(comparison),
-        // don't include a/ and b/ prefixes on files
-        '--noprefix',
-        '--no-binary',
-        '--nodate',
-        '--unified',
-        String(contextLines),
-      ],
-      'DiffCommand',
-      ctx,
-    );
-    return output.stdout;
+    return this.driver.getDiff(ctx, comparison, contextLines);
   }
 
   public runCommand(
@@ -1682,7 +1295,7 @@ export class Repository {
     ctx: RepositoryContext,
     configName: string,
   ): Promise<string | undefined> {
-    const result = (await runCommand(ctx, ['config', configName])).stdout;
+    const result = await this.driver.getConfig(ctx, configName);
     this.initialConnectionContext.logger.info(
       `loaded configs from ${ctx.cwd}: ${configName} => ${result}`,
     );
@@ -1699,6 +1312,8 @@ export class Repository {
     return this.configRateLimiter.enqueueRun(async () => {
       if (ctx.knownConfigs == null) {
         // Fetch all configs using one command.
+        // Use the global getConfigs from commands.ts which supports test overrides,
+        // rather than going through the driver directly.
         const knownConfig = new Map<ConfigName, string>(
           await getConfigs<ConfigName>(ctx, allConfigNames),
         );
@@ -1720,7 +1335,9 @@ export class Repository {
       );
     }
     // Attempt to avoid racy config read/write.
-    return this.configRateLimiter.enqueueRun(() => setConfig(ctx, level, configName, configValue));
+    return this.configRateLimiter.enqueueRun(() =>
+      this.driver.setConfig(ctx, level, configName, configValue),
+    );
   }
 
   /** Load and apply configs to `this` in background. */

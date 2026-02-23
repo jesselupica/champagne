@@ -20,6 +20,7 @@ import {clone, mockLogger, nextTick} from 'shared/testUtils';
 import {absolutePathForFileInRepo, Repository} from '../Repository';
 import {makeServerSideTracker} from '../analytics/serverSideTracker';
 import {extractRepoInfoFromUrl, setConfigOverrideForTests} from '../commands';
+import {SaplingDriver} from '../vcs/SaplingDriver';
 
 /* eslint-disable require-await */
 
@@ -117,7 +118,7 @@ describe('Repository', () => {
     it('extracting github repo info', async () => {
       setPathsDefault('https://github.com/myUsername/myRepo.git');
       const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-      const repo = new Repository(info, ctx);
+      const repo = new Repository(info, ctx, new SaplingDriver());
       expect(repo.info).toEqual({
         type: 'success',
         command: 'sl',
@@ -138,7 +139,7 @@ describe('Repository', () => {
     it('extracting github enterprise repo info', async () => {
       setPathsDefault('https://ghe.myCompany.com/myUsername/myRepo.git');
       const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-      const repo = new Repository(info, ctx);
+      const repo = new Repository(info, ctx, new SaplingDriver());
       expect(repo.info).toEqual({
         type: 'success',
         command: 'sl',
@@ -159,7 +160,7 @@ describe('Repository', () => {
     it('handles non-github-enterprise unknown code review providers', async () => {
       setPathsDefault('https://gitlab.myCompany.com/myUsername/myRepo.git');
       const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-      const repo = new Repository(info, ctx);
+      const repo = new Repository(info, ctx, new SaplingDriver());
       expect(repo.info).toEqual({
         type: 'success',
         command: 'sl',
@@ -179,7 +180,7 @@ describe('Repository', () => {
   it('applies isl.hold-off-refresh-ms config', async () => {
     setConfigOverrideForTests([['isl.hold-off-refresh-ms', '12345']], false);
     const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-    const repo = new Repository(info, ctx);
+    const repo = new Repository(info, ctx, new SaplingDriver());
     await new Promise(process.nextTick);
     expect(repo.configHoldOffRefreshMs).toBe(12345);
   });
@@ -193,7 +194,7 @@ describe('Repository', () => {
       [/^sl debugroots/, {stdout: '/path/to/myRepo/submodule\n/path/to/myRepo'}],
     ]);
     const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-    const repo = new Repository(info, ctx);
+    const repo = new Repository(info, ctx, new SaplingDriver());
     expect(repo.info).toEqual({
       type: 'success',
       command: 'sl',
@@ -246,7 +247,7 @@ describe('Repository', () => {
       [/^sl root/, {stdout: '/path/to/myRepo'}],
     ]);
     const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-    const repo = new Repository(info, ctx);
+    const repo = new Repository(info, ctx, new SaplingDriver());
     // @ts-expect-error We expect a type error in addition to runtime validation
     await expect(repo.setConfig(ctx, 'user', 'some-random-config', 'hi')).rejects.toEqual(
       new Error('config some-random-config not in allowlist for settable configs'),
@@ -270,7 +271,7 @@ describe('Repository', () => {
     });
 
     async function runOperation(op: Partial<RunnableOperation>) {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
       const progressSpy = jest.fn();
 
       await repo.runOrQueueOperation(
@@ -400,7 +401,7 @@ www/flib/intern/entity/diff/EntPhabricatorDiffSchema.php                        
 2 files changed, 45 insertions(+), 0 deletions(-)\n`;
 
     it('parses sloc', async () => {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
       const ejecaSpy = mockEjeca([[/^sl diff/, () => ({stdout: EXAMPLE_DIFFSTAT})]]);
       const results = repo.fetchSignificantLinesOfCode(ctx, 'abcdef', ['generated.file']);
@@ -422,7 +423,7 @@ www/flib/intern/entity/diff/EntPhabricatorDiffSchema.php                        
     });
 
     it('handles empty generated list', async () => {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
       const ejecaSpy = mockEjeca([[/^sl diff/, () => ({stdout: EXAMPLE_DIFFSTAT})]]);
       repo.fetchSignificantLinesOfCode(ctx, 'abcdef', []);
       expect(ejecaSpy).toHaveBeenCalledWith(
@@ -433,7 +434,7 @@ www/flib/intern/entity/diff/EntPhabricatorDiffSchema.php                        
     });
 
     it('handles multiple generated files', async () => {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
       const ejecaSpy = mockEjeca([[/^sl diff/, () => ({stdout: EXAMPLE_DIFFSTAT})]]);
       const generatedFiles = ['generated1.file', 'generated2.file'];
       repo.fetchSignificantLinesOfCode(ctx, 'abcdef', generatedFiles);
@@ -477,7 +478,7 @@ www/flib/intern/entity/diff/EntPhabricatorDiffSchema.php                        
     };
 
     it('uses correct revset in normal case', async () => {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
       const ejecaSpy = mockEjeca([]);
 
@@ -490,7 +491,7 @@ www/flib/intern/entity/diff/EntPhabricatorDiffSchema.php                        
 
     it('updates revset when changing date range', async () => {
       const ejecaSpy = mockEjeca([]);
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
       repo.nextVisibleCommitRangeInDays();
       await repo.fetchSmartlogCommits();
@@ -506,7 +507,7 @@ www/flib/intern/entity/diff/EntPhabricatorDiffSchema.php                        
 
     it('fetches additional revsets', async () => {
       const ejecaSpy = mockEjeca([]);
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
       repo.stableLocations = [
         {name: 'mystable', hash: 'aaa', info: 'this is the stable for aaa', date: new Date(0)},
@@ -648,7 +649,7 @@ ${MARK_OUT}
     });
 
     it('checks for merge conflicts', async () => {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
       const onChange = jest.fn();
       repo.onChangeConflictState(onChange);
@@ -676,7 +677,7 @@ ${MARK_OUT}
     });
 
     it('shows deleted file conflicts', async () => {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
       const onChange = jest.fn();
       repo.onChangeConflictState(onChange);
@@ -747,7 +748,7 @@ ${MARK_OUT}
     });
 
     it('disposes conflict change subscriptions', async () => {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
       const onChange = jest.fn();
       const subscription = repo.onChangeConflictState(onChange);
@@ -761,7 +762,7 @@ ${MARK_OUT}
     it('sends conflicts right away on subscription if already in conflicts', async () => {
       enterMergeConflict(MOCK_CONFLICT);
 
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
       const onChange = jest.fn();
       repo.onChangeConflictState(onChange);
@@ -783,7 +784,7 @@ ${MARK_OUT}
     });
 
     it('preserves previous conflicts as resolved', async () => {
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
       const onChange = jest.fn();
       repo.onChangeConflictState(onChange);
 
@@ -824,7 +825,7 @@ ${MARK_OUT}
         [/^sl resolve --tool internal:dumpjson --all/, new Error('failed to do the thing')],
       ]);
 
-      const repo = new Repository(repoInfo, ctx);
+      const repo = new Repository(repoInfo, ctx, new SaplingDriver());
       const onChange = jest.fn();
       repo.onChangeConflictState(onChange);
 
@@ -968,7 +969,7 @@ describe('absolutePathForFileInRepo', () => {
       pullRequestDomain: undefined,
       isEdenFs: false,
     };
-    const repo = new Repository(repoInfo, ctx);
+    const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
     expect(absolutePathForFileInRepo('foo/bar/file.txt', repo)).toEqual(
       '/path/to/repo/foo/bar/file.txt',
@@ -995,7 +996,7 @@ describe('absolutePathForFileInRepo', () => {
       pullRequestDomain: undefined,
       isEdenFs: false,
     };
-    const repo = new Repository(repoInfo, ctx);
+    const repo = new Repository(repoInfo, ctx, new SaplingDriver());
 
     expect(absolutePathForFileInRepo('foo\\bar\\file.txt', repo, path.win32)).toEqual(
       'C:\\path\\to\\repo\\foo\\bar\\file.txt',
@@ -1094,7 +1095,7 @@ describe('fetchSubmoduleMap', () => {
       [/^sl debuggitmodules/, {stdout: submodulesJson}],
     ]);
     const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-    const repo = new Repository(info, ctx);
+    const repo = new Repository(info, ctx, new SaplingDriver());
     await repo.fetchSubmoduleMap();
     const fetchedSubmoduleMap = repo.getSubmoduleMap();
     expect(fetchedSubmoduleMap).not.toBeUndefined();
@@ -1110,7 +1111,7 @@ describe('fetchSubmoduleMap', () => {
       [/^sl debuggitmodules/, {stdout: submodulesJson}],
     ]);
     const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-    const repo = new Repository(info, ctx);
+    const repo = new Repository(info, ctx, new SaplingDriver());
     await repo.fetchSubmoduleMap();
     const fetchedSubmoduleMap = repo.getSubmoduleMap();
     expect(fetchedSubmoduleMap).not.toBeUndefined();
@@ -1150,7 +1151,7 @@ describe('fetchSubmoduleMap', () => {
     ]);
     const updatedCtx = {...ctx, cwd: submoduleBRoot};
     const info = (await Repository.getRepoInfo(updatedCtx)) as ValidatedRepoInfo;
-    const repo = new Repository(info, updatedCtx);
+    const repo = new Repository(info, updatedCtx, new SaplingDriver());
     await repo.fetchSubmoduleMap();
     const fetchedSubmoduleMap = repo.getSubmoduleMap();
 
@@ -1167,7 +1168,7 @@ describe('fetchSubmoduleMap', () => {
       [/^sl debuggitmodules/, new Error(msg)],
     ]);
     const info = (await Repository.getRepoInfo(ctx)) as ValidatedRepoInfo;
-    const repo = new Repository(info, ctx);
+    const repo = new Repository(info, ctx, new SaplingDriver());
     await repo.fetchSubmoduleMap();
     const fetchedSubmoduleMap = repo.getSubmoduleMap();
 

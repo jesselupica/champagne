@@ -89,6 +89,7 @@ describe('run-proxy', () => {
     force: false,
     slVersion: '1.0',
     command: 'sl',
+    vcsType: 'sapling' as const,
     cwd: undefined,
     sessionId: undefined,
   };

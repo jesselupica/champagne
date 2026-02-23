@@ -16,6 +16,7 @@ import {defer} from 'shared/utils';
 import {Repository} from '../Repository';
 import {makeServerSideTracker} from '../analytics/serverSideTracker';
 import {setConfigOverrideForTests} from '../commands';
+import {SaplingDriver} from '../vcs/SaplingDriver';
 
 /** Matches any non-empty string */
 const anyActualString = expect.stringMatching(/.+/);
@@ -147,6 +148,7 @@ describe('track', () => {
         isEdenFs: false,
       },
       mockCtx,
+      new SaplingDriver(),
     );
     tracker.context.setRepo(repo);
     tracker.track('ClickedRefresh');
