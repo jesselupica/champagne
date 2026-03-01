@@ -164,7 +164,9 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('generates a shell script for --quit that saves already-rebased commits', () => {
       const result = translate(['rebase', '--quit']);
       expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('rewritten-list');
       expect(result.args[1]).toContain('rebase --abort');
+      expect(result.args[1]).toContain('cherry-pick');
     });
   });
 
