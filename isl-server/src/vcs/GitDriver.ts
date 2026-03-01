@@ -1024,6 +1024,26 @@ export class GitDriver implements VCSDriver {
       const hash = revIdx !== -1 ? args[revIdx + 1] : 'HEAD';
       return {args: ['branch', name, hash], stdin};
     }
+    if (args[0] === 'shelve') {
+      if (args[1] === '--delete') {
+        return {args: ['stash', 'drop'], stdin};
+      }
+      const out: string[] = ['stash', 'push'];
+      let name: string | undefined;
+      const files: string[] = [];
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--unknown') { out.push('-u'); continue; }
+        if (args[i] === '--name' && i + 1 < args.length) { name = args[++i]; continue; }
+        files.push(args[i]);
+      }
+      if (name) out.push('-m', name);
+      if (files.length > 0) out.push('--', ...files);
+      return {args: out, stdin};
+    }
+    if (args[0] === 'unshelve') {
+      const keep = args.includes('--keep');
+      return {args: ['stash', keep ? 'apply' : 'pop'], stdin};
+    }
     if (args[0] === 'rebase') {
       if (args.includes('--keep')) {
         // RebaseKeepOperation: copy without moving → cherry-pick

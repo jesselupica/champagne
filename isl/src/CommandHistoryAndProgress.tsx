@@ -97,6 +97,24 @@ function translateArgsForDisplay(
     const hash = revIdx !== -1 ? args[revIdx + 1] : 'HEAD';
     return ['branch', name, hash];
   }
+  if (first === 'shelve') {
+    if (args[1] === '--delete') return ['stash', 'drop'];
+    const out: typeof args = ['stash', 'push'];
+    let name: typeof args[0] | undefined;
+    const files: typeof args = [];
+    for (let i = 1; i < args.length; i++) {
+      const a = args[i];
+      if (a === '--unknown') { out.push('-u'); continue; }
+      if (a === '--name' && i + 1 < args.length) { name = args[i + 1]; i++; continue; }
+      files.push(a);
+    }
+    if (name !== undefined) out.push('-m', name);
+    if (files.length > 0) out.push('--', ...files);
+    return out;
+  }
+  if (first === 'unshelve') {
+    return ['stash', args.includes('--keep') ? 'apply' : 'pop'];
+  }
   if (first === 'rebase') {
     if (args.includes('--keep')) {
       const revIdx = args.indexOf('--rev');

@@ -130,4 +130,38 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('shelve', () => {
+    it('translates shelve to git stash push', () => {
+      expect(translate(['shelve', '--unknown', '--name', 'wip', 'file.txt'])).toEqual({
+        args: ['stash', 'push', '-u', '-m', 'wip', '--', 'file.txt'],
+      });
+    });
+
+    it('translates shelve with no files', () => {
+      expect(translate(['shelve', '--unknown', '--name', 'wip'])).toEqual({
+        args: ['stash', 'push', '-u', '-m', 'wip'],
+      });
+    });
+
+    it('translates shelve --delete to stash drop', () => {
+      expect(translate(['shelve', '--delete', 'wip'])).toEqual({
+        args: ['stash', 'drop'],
+      });
+    });
+  });
+
+  describe('unshelve', () => {
+    it('translates unshelve --keep to stash apply', () => {
+      expect(translate(['unshelve', '--keep', '--name', 'wip'])).toEqual({
+        args: ['stash', 'apply'],
+      });
+    });
+
+    it('translates unshelve (no --keep) to stash pop', () => {
+      expect(translate(['unshelve', '--name', 'wip'])).toEqual({
+        args: ['stash', 'pop'],
+      });
+    });
+  });
 });
