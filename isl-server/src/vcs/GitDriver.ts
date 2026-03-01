@@ -1117,9 +1117,11 @@ export class GitDriver implements VCSDriver {
       }
       if (args.includes('--keep')) {
         const revIdx = args.indexOf('--rev');
-        const destIdx = Math.max(args.indexOf('--dest'), args.indexOf('-d'));
         const src = revIdx !== -1 ? args[revIdx + 1] : undefined;
-        const dest = destIdx !== -1 ? args[destIdx + 1] : undefined;
+        let dest: string | undefined;
+        for (let i = 1; i < args.length; i++) {
+          if ((args[i] === '--dest' || args[i] === '-d') && i + 1 < args.length) dest = args[++i];
+        }
         if (!src) throw new Error('rebase --keep requires --rev');
         if (dest) {
           // Quote src and dest to prevent shell injection

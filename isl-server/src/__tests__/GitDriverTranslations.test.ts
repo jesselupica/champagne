@@ -148,8 +148,11 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('checks out destination before cherry-pick when --dest is provided', () => {
       const result = translate(['rebase', '--keep', '--rev', 'abc123', '--dest', 'def456']);
       expect(result.args[0]).toBe('__shell__');
-      expect(result.args[1]).toContain('checkout "def456"');
-      expect(result.args[1]).toContain('cherry-pick "abc123"');
+      const script = result.args[1] as string;
+      expect(script).toContain('checkout "def456"');
+      expect(script).toContain('cherry-pick "abc123"');
+      // Verify ordering: checkout must precede cherry-pick
+      expect(script.indexOf('checkout')).toBeLessThan(script.indexOf('cherry-pick'));
     });
 
     it('falls back to direct cherry-pick when --dest is absent', () => {
@@ -157,6 +160,13 @@ describe('GitDriver.normalizeOperationArgs', () => {
         args: ['cherry-pick', 'abc123'],
         stdin: undefined,
       });
+    });
+
+    it('also works with -d short form', () => {
+      const result = translate(['rebase', '--keep', '--rev', 'abc123', '-d', 'def456']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('checkout "def456"');
+      expect(result.args[1]).toContain('cherry-pick "abc123"');
     });
   });
 
