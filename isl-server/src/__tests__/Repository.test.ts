@@ -880,6 +880,19 @@ ${MARK_OUT}
       } as unknown as import('../vcs/VCSDriver').VCSDriver;
     }
 
+    // Spy on fs.promises.readFile to control git-rebase-todo content.
+    // Default: empty file → stale state → auto-continue should fire.
+    let readFileSpy: jest.SpyInstance;
+    beforeEach(() => {
+      readFileSpy = jest
+        .spyOn(fs.promises, 'readFile')
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        .mockResolvedValue('' as any);
+    });
+    afterEach(() => {
+      readFileSpy.mockRestore();
+    });
+
     it('auto-continues and clears state when rebase has no conflict files', async () => {
       const runCommand = jest.fn().mockResolvedValue({stdout: ''});
       const checkMergeConflicts = jest.fn().mockResolvedValue({
@@ -910,6 +923,40 @@ ${MARK_OUT}
       );
       // After auto-continue succeeds, conflict state should be cleared
       expect(repo.getMergeConflicts()).toBeUndefined();
+    });
+
+    it('does NOT auto-continue when git-rebase-todo has pending commits', async () => {
+      // Simulate an active rebase: the conflicting commit is still listed in the todo.
+      readFileSpy.mockResolvedValue('pick abc1234 some commit message\n' as any);
+
+      const runCommand = jest.fn().mockResolvedValue({stdout: ''});
+      const checkMergeConflicts = jest.fn().mockResolvedValue({
+        state: 'loaded',
+        command: 'rebase',
+        toContinue: 'rebase --continue',
+        toAbort: 'rebase --abort',
+        files: [],
+        fetchStartTimestamp: Date.now(),
+        fetchCompletedTimestamp: Date.now(),
+      });
+      const driver = makeMockDriver({
+        hasPotentialOperation: jest.fn().mockResolvedValue(true),
+        checkMergeConflicts,
+        runCommand,
+      });
+
+      const repo = new Repository(repoInfo, ctx, driver);
+      repo.onChangeConflictState(jest.fn());
+
+      await repo.checkForMergeConflicts();
+
+      expect(runCommand).not.toHaveBeenCalledWith(
+        expect.anything(),
+        ['rebase', '--continue'],
+        expect.anything(),
+      );
+      // Conflict state remains so the user can click Continue themselves
+      expect(repo.getMergeConflicts()).toBeDefined();
     });
 
     it('does NOT auto-continue when rebase has conflict files', async () => {
