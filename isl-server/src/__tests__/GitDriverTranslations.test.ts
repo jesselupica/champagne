@@ -545,6 +545,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       const result = translate(['amend', '--to', 'abc123', 'file.txt']);
       expect(result.args[0]).toBe('__shell__');
       const script = result.args[1] as string;
+      expect(script).toContain('set -e');
       expect(script).toContain('git stash push');
       expect(script).toContain('"abc123"');
       expect(script).toContain('git stash pop');
@@ -562,6 +563,15 @@ describe('GitDriver.normalizeOperationArgs', () => {
       const script = result.args[1] as string;
       expect(script).toContain('"abc123"');
       expect(script).toContain('commit --amend');
+    });
+
+    it('amend --to HEAD commit uses git branch -f to update branch pointer', () => {
+      const result = translate(['amend', '--to', 'abc123']);
+      expect(result.args[0]).toBe('__shell__');
+      const script = result.args[1] as string;
+      // HEAD case: else branch must force-update the branch pointer
+      expect(script).toContain('git branch -f "$ORIG_BRANCH" $NEW_TARGET');
+      expect(script).toContain('git checkout --detach $NEW_TARGET');
     });
   });
 

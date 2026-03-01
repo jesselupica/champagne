@@ -1019,6 +1019,7 @@ export class GitDriver implements VCSDriver {
           `NEW_TARGET=$(git rev-parse HEAD)`,
           // If there were commits above the target, rebase them onto the new amended commit
           `if [ "$ORIG_TIP" != "$TARGET_SHA" ]; then`,
+          // $NEW_TARGET, $TARGET_SHA, $ORIG_TIP, $NEW_TIP are intentionally unquoted — single SHAs, word-split is harmless
           `  git rebase --onto $NEW_TARGET $TARGET_SHA $ORIG_TIP`,
           `  NEW_TIP=$(git rev-parse HEAD)`,
           `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
