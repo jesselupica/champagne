@@ -413,8 +413,9 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
 
     it('does not affect pull --rev (PullRevOperation still works)', () => {
-      const result = translate(['pull', '--rev', 'abc123']);
-      expect(result.args).not.toContain('--all');
+      expect(translate(['pull', '--rev', 'abc123'])).toEqual({
+        args: ['fetch', 'origin', 'abc123'],
+      });
     });
   });
 });
