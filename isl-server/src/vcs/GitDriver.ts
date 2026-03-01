@@ -1044,7 +1044,7 @@ export class GitDriver implements VCSDriver {
         `  NEW_TIP=$(git rev-parse HEAD)`,
         `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
         `else`,
-        `  if [ -n "$ORIG_BRANCH" ]; then git checkout "$ORIG_BRANCH"; fi`,
+        `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_HASH && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_HASH; fi`,
         `fi`,
       ].join('\n');
 
