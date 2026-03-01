@@ -644,13 +644,28 @@ export class GitDriver implements VCSDriver {
       0, // no timeout
     );
 
+    return this.parseBlameOutput(result.stdout);
+  }
+
+  /**
+   * Parse the output of `git blame --porcelain` into an array of
+   * `{line, node}` entries.
+   *
+   * The porcelain format is:
+   *   <40-hex-hash> <orig-line> <final-line> <count>
+   *   [metadata lines — only present on first occurrence of each hash]
+   *   \t<line content>
+   *
+   * Subsequent occurrences of the same hash omit the metadata block and
+   * only emit the hash header + optional filename + content line.
+   */
+  parseBlameOutput(output: string): Array<{line: string; node: string}> {
     const lines: Array<{line: string; node: string}> = [];
-    const output = result.stdout;
     const outputLines = output.split('\n');
 
     for (let i = 0; i < outputLines.length; i++) {
       const blameLine = outputLines[i];
-      // Blame header lines start with a hash (40 hex chars)
+      // Blame header lines start with a 40-char hex hash
       if (/^[0-9a-f]{40}/.test(blameLine)) {
         const commitHash = blameLine.substring(0, 40);
         // Scan forward to find the content line (starts with \t)
