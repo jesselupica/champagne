@@ -1264,15 +1264,19 @@ export class GitDriver implements VCSDriver {
     const script = [
       `ORIG_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)`,
       `ORIG_TIP=$(git rev-parse HEAD)`,
+      `TOP_SHA=$(git rev-parse "${topHash}")`,
+      // $FOLD, $ORIG_TIP, $NEW_TIP and $TOP_SHA are intentionally unquoted — they are
+      // single 40-char SHAs from git rev-parse; word-splitting is harmless and required
+      // as positional arguments to git commands.
       `git checkout "${topHash}"`,
       `git reset --soft "${bottomHash}^"`,
       `git commit --message '${escapedMsg}'`,
       `FOLD=$(git rev-parse HEAD)`,
       // Only rebase if there were commits above topHash
-      `if [ "$ORIG_TIP" != "${topHash}" ]; then`,
+      `if [ "$ORIG_TIP" != "$TOP_SHA" ]; then`,
       `  git rebase --onto $FOLD "${topHash}" $ORIG_TIP`,
       `  NEW_TIP=$(git rev-parse HEAD)`,
-      `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; fi`,
+      `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
       `else`,
       `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $FOLD && git checkout "$ORIG_BRANCH"; fi`,
       `fi`,

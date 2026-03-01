@@ -425,15 +425,31 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('generates a shell script that limits squash to the exact range', () => {
       const result = translate(['fold', '--exact', 'aaa111::bbb222', '--message', 'merged']);
       expect(result.args[0]).toBe('__shell__');
-      // Must reference both hashes
-      expect(result.args[1]).toContain('bbb222');
-      expect(result.args[1]).toContain('aaa111');
-      expect(result.args[1]).toContain('merged');
+      const script = result.args[1] as string;
+      // Both hashes and message must appear
+      expect(script).toContain('bbb222');
+      expect(script).toContain('aaa111');
+      expect(script).toContain('merged');
+      // checkout topHash before reset to bottomHash^
+      expect(script.indexOf('checkout "bbb222"')).toBeLessThan(script.indexOf('reset --soft'));
+      // commit comes after reset
+      expect(script.indexOf('reset --soft')).toBeLessThan(script.indexOf('git commit'));
     });
 
     it('script contains a rebase --onto step to replay commits above the fold range', () => {
       const result = translate(['fold', '--exact', 'aaa111::bbb222', '--message', 'merged']);
-      expect(result.args[1]).toContain('rebase --onto');
+      const script = result.args[1] as string;
+      expect(script).toContain('rebase --onto');
+      // topHash used as the upstream exclusion boundary in rebase --onto
+      expect(script).toContain('"bbb222"');
+      // Conditional: only rebase if ORIG_TIP differs from topHash
+      expect(script).toContain('ORIG_TIP');
+      expect(script).toContain('TOP_SHA');
+    });
+
+    it('escapes single quotes in the commit message', () => {
+      const result = translate(['fold', '--exact', 'aaa111::bbb222', '--message', "it's done"]);
+      expect(result.args[1]).toContain("it'\\''s done");
     });
   });
 
