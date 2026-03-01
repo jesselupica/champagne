@@ -202,4 +202,39 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('purge', () => {
+    it('translates purge --files file to shell rm -f file', () => {
+      const result = translate(['purge', '--files', '--abort-on-err', 'dead.txt']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('dead.txt');
+    });
+
+    it('handles multiple files', () => {
+      const result = translate(['purge', '--files', 'a.txt', 'b.txt']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('a.txt');
+      expect(result.args[1]).toContain('b.txt');
+    });
+
+    it('handles purge with no files gracefully', () => {
+      const result = translate(['purge', '--files', '--abort-on-err']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toBe('true');
+    });
+  });
+
+  describe('push', () => {
+    it('translates push --rev REV --to BRANCH REMOTE to push REMOTE REV:BRANCH', () => {
+      expect(translate(['push', '--rev', 'abc123', '--to', 'main', 'origin'])).toEqual({
+        args: ['push', 'origin', 'abc123:main'],
+      });
+    });
+
+    it('uses origin as default remote if none specified', () => {
+      expect(translate(['push', '--rev', 'abc123', '--to', 'main'])).toEqual({
+        args: ['push', 'origin', 'abc123:main'],
+      });
+    });
+  });
 });

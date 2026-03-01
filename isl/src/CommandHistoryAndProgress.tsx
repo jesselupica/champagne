@@ -47,6 +47,36 @@ function translateArgsForDisplay(
     return args;
   }
   const first = args[0];
+  if (first === 'fold') {
+    // fold --exact HASH1::HASH2 --message MSG → display as rebase -i BOTTOM^
+    const exactIdx = args.indexOf('--exact');
+    const revset = exactIdx !== -1 ? String(args[exactIdx + 1]) : '??';
+    const bottom = revset.split('::')[0] ?? '??';
+    return ['rebase', '-i', bottom + '^'];
+  }
+  if (first === 'hide') {
+    const revIdx = args.indexOf('--rev');
+    const hash = revIdx !== -1 ? String(args[revIdx + 1]) : '??';
+    return ['branch', '-D', '<branches-at-' + hash.slice(0, 8) + '>'];
+  }
+  if (first === 'pull' && args.includes('--rev')) {
+    const revIdx = args.indexOf('--rev');
+    const hash = revIdx !== -1 ? args[revIdx + 1] : '??';
+    return ['fetch', 'origin', hash];
+  }
+  if (first === 'purge') {
+    const files = args.filter(a => a !== 'purge' && a !== '--files' && a !== '--abort-on-err');
+    return ['rm', '-f', ...files];
+  }
+  if (first === 'push') {
+    let rev: typeof args[0] = '??', branch: typeof args[0] = '??', remote: typeof args[0] = 'origin';
+    for (let i = 1; i < args.length; i++) {
+      if (args[i] === '--rev' && i + 1 < args.length) { rev = args[i + 1]; i++; continue; }
+      if (args[i] === '--to' && i + 1 < args.length) { branch = args[i + 1]; i++; continue; }
+      if (typeof args[i] === 'string' && !String(args[i]).startsWith('-')) remote = args[i];
+    }
+    return ['push', remote, String(rev) + ':' + String(branch)];
+  }
   if (first === 'forget') {
     return ['rm', '--cached', ...args.slice(1)];
   }

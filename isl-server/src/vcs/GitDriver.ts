@@ -1083,6 +1083,23 @@ export class GitDriver implements VCSDriver {
     if (args[0] === 'continue') {
       return {args: ['rebase', '--continue'], stdin};
     }
+    if (args[0] === 'purge') {
+      const files = args.filter(a => a !== 'purge' && a !== '--files' && a !== '--abort-on-err');
+      const rmCmds = files.map(f => `rm -f "${f}"`).join(' && ');
+      return {args: ['__shell__', rmCmds || 'true'], stdin};
+    }
+    if (args[0] === 'push') {
+      let rev: string | undefined, branch: string | undefined, remote: string | undefined;
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--rev' && i + 1 < args.length) rev = args[++i];
+        else if (args[i] === '--to' && i + 1 < args.length) branch = args[++i];
+        else if (!args[i].startsWith('-')) remote = args[i];
+      }
+      if (rev && branch) {
+        return {args: ['push', remote ?? 'origin', `${rev}:${branch}`], stdin};
+      }
+      return {args, stdin};
+    }
 
     return {args, stdin};
   }
