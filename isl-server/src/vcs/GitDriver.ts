@@ -1296,25 +1296,25 @@ export class GitDriver implements VCSDriver {
   /**
    * Translate `hide --rev HASH` to git commands that make the commit unreachable.
    *
-   * Finds all local branches pointing at the hash and deletes them via
-   * `for-each-ref --points-at`. If no branch points at it, the commit is
-   * already unreachable from branch refs and we just need to ensure HEAD
-   * isn't on it.
+   * Finds all local branches that contain the hash anywhere in their history
+   * via `git branch --contains` and deletes them. If the currently checked-out
+   * branch is one being deleted, detaches HEAD to the hidden commit's parent first.
    */
   private translateHideToGit(args: string[], stdin: string | undefined): ResolvedCommand {
     const revIdx = args.indexOf('--rev');
     if (revIdx === -1) throw new Error('hide requires --rev <hash>');
     const hash = args[revIdx + 1];
+    if (!hash) throw new Error('hide --rev requires a hash value');
 
-    // If HEAD is currently at the hidden commit (or a descendant), move to the
-    // hidden commit's parent first so we don't delete the checked-out branch.
-    // Then delete all branches that contain the hidden commit in their history
-    // (this covers the commit itself and all its draft descendants).
     const script = [
-      // Move HEAD away if it points to the hidden commit or a descendant
-      `if git merge-base --is-ancestor "${hash}" HEAD 2>/dev/null; then git checkout --detach "${hash}^"; fi`,
-      // Delete every local branch that has the hidden commit as an ancestor
-      `for b in $(git branch --contains "${hash}" --format='%(refname:short)' 2>/dev/null); do git branch -D "$b"; done`,
+      // Collect the list of branches to delete (contains the hidden commit anywhere in history)
+      `BRANCHES=$(git branch --contains "${hash}" --format='%(refname:short)' 2>/dev/null)`,
+      // Get the current branch name (empty string if in detached HEAD state)
+      `CURRENT=$(git symbolic-ref --short HEAD 2>/dev/null || echo '')`,
+      // If the current branch is in the delete list, detach HEAD to the parent first
+      `if [ -n "$CURRENT" ] && echo "$BRANCHES" | grep -qxF "$CURRENT"; then git checkout --detach "${hash}^"; fi`,
+      // Delete each branch in the list
+      `echo "$BRANCHES" | while IFS= read -r b; do [ -n "$b" ] && git branch -D "$b"; done`,
     ].join(' && ');
 
     return {args: ['__shell__', script], stdin};

@@ -415,6 +415,9 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('still deletes branches and moves HEAD away if needed', () => {
       const result = translate(['hide', '--rev', 'abc123']);
       expect(result.args[1]).toContain('branch -D');
+      // Verify HEAD-movement logic is present
+      expect(result.args[1]).toContain('checkout --detach');
+      expect(result.args[1]).toContain('symbolic-ref');
     });
   });
 
