@@ -1230,6 +1230,54 @@ export class GitDriver implements VCSDriver {
         return {args: ['rm', '--cached', ...files], stdin};
       }
       // resolve --tool internal:dumpjson --all (conflict detection, not a user action)
+      if (args.includes('--tool') && args[args.indexOf('--tool') + 1] === 'internal:dumpjson') {
+        return {args, stdin};
+      }
+      const toolIdx = args.indexOf('--tool');
+      const hasAll = args.includes('--all');
+      if (toolIdx !== -1) {
+        const tool = args[toolIdx + 1];
+        // Find file arg: last positional that isn't a flag or the tool value
+        const fileArgs = args.filter((a, i) =>
+          a !== 'resolve' && a !== '--tool' && a !== tool && a !== '--all' &&
+          !String(a).startsWith('-') && i !== toolIdx + 1
+        );
+        const file = fileArgs[0];
+        if (tool === 'internal:merge-local') {
+          const escapedFile = String(file).replace(/"/g, '\\"');
+          const script = `git checkout --ours -- "${escapedFile}" && git add "${escapedFile}"`;
+          return {args: ['__shell__', script], stdin};
+        }
+        if (tool === 'internal:merge-other') {
+          const escapedFile = String(file).replace(/"/g, '\\"');
+          const script = `git checkout --theirs -- "${escapedFile}" && git add "${escapedFile}"`;
+          return {args: ['__shell__', script], stdin};
+        }
+        if (tool === 'internal:union') {
+          const escapedFile = String(file).replace(/"/g, '\\"');
+          const script =
+            `set -e; FILE="${escapedFile}"; ` +
+            `git show :2:"$FILE" > /tmp/git-isl-union-$$-ours; ` +
+            `git show :1:"$FILE" > /tmp/git-isl-union-$$-base; ` +
+            `git show :3:"$FILE" > /tmp/git-isl-union-$$-theirs; ` +
+            `git merge-file --union /tmp/git-isl-union-$$-ours /tmp/git-isl-union-$$-base /tmp/git-isl-union-$$-theirs || true; ` +
+            `cp /tmp/git-isl-union-$$-ours "$FILE"; ` +
+            `git add "$FILE"`;
+          return {args: ['__shell__', script], stdin};
+        }
+        // External merge tool: git mergetool --tool=<tool> [<file>]
+        if (hasAll || file === undefined) {
+          const script = `git mergetool --tool=${tool}`;
+          return {args: ['__shell__', script], stdin};
+        }
+        const escapedFile = String(file).replace(/"/g, '\\"');
+        const script = `git mergetool --tool=${tool} "${escapedFile}"`;
+        return {args: ['__shell__', script], stdin};
+      }
+      // resolve --all (no --tool): run mergetool on all unresolved files
+      if (hasAll) {
+        return {args: ['__shell__', 'git mergetool'], stdin};
+      }
       return {args, stdin};
     }
     if (args[0] === 'continue') {

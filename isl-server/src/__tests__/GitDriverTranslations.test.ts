@@ -349,6 +349,54 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
+  describe('resolve --tool (ResolveOperation tool variants)', () => {
+    it('resolve --tool internal:merge-local keeps our version', () => {
+      const result = translate(['resolve', '--tool', 'internal:merge-local', 'src/foo.ts']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('checkout --ours');
+      expect(result.args[1]).toContain('src/foo.ts');
+      expect(result.args[1]).toContain('git add');
+    });
+
+    it('resolve --tool internal:merge-other keeps their version', () => {
+      const result = translate(['resolve', '--tool', 'internal:merge-other', 'src/foo.ts']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('checkout --theirs');
+      expect(result.args[1]).toContain('src/foo.ts');
+      expect(result.args[1]).toContain('git add');
+    });
+
+    it('resolve --tool internal:union merges with union strategy', () => {
+      const result = translate(['resolve', '--tool', 'internal:union', 'src/foo.ts']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('merge-file --union');
+      expect(result.args[1]).toContain('src/foo.ts');
+      expect(result.args[1]).toContain('git add');
+    });
+
+    it('resolve --tool <external> opens mergetool', () => {
+      const result = translate(['resolve', '--tool', 'vimdiff', 'src/foo.ts']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('mergetool');
+      expect(result.args[1]).toContain('--tool=vimdiff');
+      expect(result.args[1]).toContain('src/foo.ts');
+    });
+
+    it('resolve --tool <external> with --all runs mergetool on all files', () => {
+      const result = translate(['resolve', '--tool', 'vimdiff', '--all']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('mergetool');
+      expect(result.args[1]).toContain('--tool=vimdiff');
+      // no specific file
+    });
+
+    it('resolve --all runs mergetool on all unresolved files', () => {
+      const result = translate(['resolve', '--all']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('mergetool');
+    });
+  });
+
   describe('continue (ContinueOperation)', () => {
     it('generates a shell script that routes to the correct --continue based on git state', () => {
       const result = translate(['continue']);

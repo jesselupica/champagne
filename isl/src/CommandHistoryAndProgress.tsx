@@ -153,6 +153,33 @@ function translateArgsForDisplay(
     if (args.includes('--unmark')) {
       return ['rm', '--cached', ...args.filter(a => a !== 'resolve' && a !== '--unmark')];
     }
+    const toolIdx = args.indexOf('--tool');
+    const hasAll = args.includes('--all');
+    if (toolIdx !== -1) {
+      const tool = String(args[toolIdx + 1]);
+      const fileArgs = args.filter((a, i) =>
+        a !== 'resolve' && a !== '--tool' && String(a) !== tool && a !== '--all' &&
+        !String(a).startsWith('-') && i !== toolIdx + 1
+      );
+      const file = fileArgs[0];
+      if (tool === 'internal:merge-local') {
+        return ['checkout', '--ours', '--', ...(file !== undefined ? [file] : [])];
+      }
+      if (tool === 'internal:merge-other') {
+        return ['checkout', '--theirs', '--', ...(file !== undefined ? [file] : [])];
+      }
+      if (tool === 'internal:union') {
+        return ['merge-file', '--union', ...(file !== undefined ? [file] : [])];
+      }
+      // External merge tool
+      if (hasAll || file === undefined) {
+        return ['mergetool', `--tool=${tool}`];
+      }
+      return ['mergetool', `--tool=${tool}`, file];
+    }
+    if (hasAll) {
+      return ['mergetool'];
+    }
     return args;
   }
   // Slash-separated because the actual command is determined at runtime based on git state
