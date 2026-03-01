@@ -74,4 +74,18 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('goto', () => {
+    it('translates goto --rev HASH to checkout HASH', () => {
+      expect(translate(['goto', '--rev', 'abc123'])).toEqual({
+        args: ['checkout', 'abc123'],
+      });
+    });
+
+    it('translates goto --clean . to checkout -- .', () => {
+      expect(translate(['goto', '--clean', '.'])).toEqual({
+        args: ['checkout', '--', '.'],
+      });
+    });
+  });
 });

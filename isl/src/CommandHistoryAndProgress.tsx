@@ -73,6 +73,15 @@ function translateArgsForDisplay(
     }
     return out;
   }
+  if (first === 'goto') {
+    if (args.includes('--clean')) {
+      const files = args.filter(a => a !== 'goto' && a !== '--clean');
+      return ['checkout', '--', ...files];
+    }
+    const revIdx = args.indexOf('--rev');
+    const hash = revIdx !== -1 ? args[revIdx + 1] : args[1];
+    return ['checkout', hash];
+  }
   return args;
 }
 

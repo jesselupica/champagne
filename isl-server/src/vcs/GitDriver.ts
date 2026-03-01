@@ -982,6 +982,17 @@ export class GitDriver implements VCSDriver {
       }
       return {args: out, stdin};
     }
+    if (args[0] === 'goto') {
+      if (args.includes('--clean')) {
+        // Discard all working directory changes
+        const files = args.filter(a => a !== 'goto' && a !== '--clean');
+        return {args: ['checkout', '--', ...files], stdin};
+      }
+      // goto --rev HASH → checkout HASH
+      const revIdx = args.indexOf('--rev');
+      const hash = revIdx !== -1 ? args[revIdx + 1] : args[1];
+      return {args: ['checkout', hash], stdin};
+    }
     if (args[0] === 'forget') {
       // `sl forget <file>` → `git rm --cached <file>`
       return {args: ['rm', '--cached', ...args.slice(1)], stdin};
