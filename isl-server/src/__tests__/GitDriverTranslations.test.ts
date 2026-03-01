@@ -339,13 +339,13 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(result.args[0]).toBe('__shell__');
       expect(result.args[1]).toContain('git rev-parse --git-path');
       expect(result.args[1]).toContain('REBASE_MERGE');
-      expect(result.args[1]).toContain('REBASE_APPLY');  // Add this
+      expect(result.args[1]).toContain('REBASE_APPLY');
       expect(result.args[1]).toContain('rebase --continue');
       expect(result.args[1]).toContain('MERGE_HEAD');
       expect(result.args[1]).toContain('commit --no-edit');
       expect(result.args[1]).toContain('CHERRY_PICK_HEAD');
       expect(result.args[1]).toContain('cherry-pick --continue');
-      expect(result.args[1]).toContain('exit 1');  // Add this
+      expect(result.args[1]).toContain('exit 1');
     });
   });
 
