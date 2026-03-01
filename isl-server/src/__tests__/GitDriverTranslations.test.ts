@@ -109,8 +109,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('includes --author when --user is provided', () => {
       const result = translate(['metaedit', '--rev', 'abc123', '--user', 'Bob <b@c.com>', '--message', 'msg']);
       expect(result.args[0]).toBe('__shell__');
-      expect(result.args[1]).toContain('--author');
-      expect(result.args[1]).toContain('Bob');
+      expect(result.args[1]).toContain("--author 'Bob <b@c.com>'");
     });
 
     it('metaedit amending HEAD commit updates branch pointer (branch -f)', () => {

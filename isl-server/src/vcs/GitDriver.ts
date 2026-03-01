@@ -1030,6 +1030,7 @@ export class GitDriver implements VCSDriver {
       // 5. If HEAD was above the target, rebase the stack onto the new amended commit
       // 6. Restore the branch pointer
       const script = [
+        'set -e',
         `ORIG_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)`,
         `ORIG_TIP=$(git rev-parse HEAD)`,
         // Resolve target to full SHA so we can compare with ORIG_TIP
@@ -1044,6 +1045,10 @@ export class GitDriver implements VCSDriver {
         `  NEW_TIP=$(git rev-parse HEAD)`,
         `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
         `else`,
+        // branch -f needed: if targetRef was a SHA (not "HEAD"), checkout detaches HEAD;
+        // amend creates NEW_HASH in detached state but branch still points at old SHA
+        `  # Force-update branch: if target was a SHA (not "HEAD"), checkout detaches HEAD`,
+        `  # and amend creates NEW_HASH in detached state without moving the branch pointer`,
         `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_HASH && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_HASH; fi`,
         `fi`,
       ].join('\n');
