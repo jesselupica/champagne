@@ -1014,6 +1014,16 @@ export class GitDriver implements VCSDriver {
     if (args[0] === 'pull' && args.includes('--rev')) {
       return this.translatePullRevToGit(args);
     }
+    if (args[0] === 'bookmark') {
+      if (args[1] === '--delete') {
+        return {args: ['branch', '-d', args[2]], stdin};
+      }
+      // bookmark NAME --rev HASH → branch NAME HASH
+      const name = args[1];
+      const revIdx = args.indexOf('--rev');
+      const hash = revIdx !== -1 ? args[revIdx + 1] : 'HEAD';
+      return {args: ['branch', name, hash], stdin};
+    }
     if (args[0] === 'rebase') {
       if (args.includes('--keep')) {
         // RebaseKeepOperation: copy without moving → cherry-pick

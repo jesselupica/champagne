@@ -116,4 +116,18 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('bookmark', () => {
+    it('translates bookmark NAME --rev HASH to branch NAME HASH', () => {
+      expect(translate(['bookmark', 'my-branch', '--rev', 'abc123'])).toEqual({
+        args: ['branch', 'my-branch', 'abc123'],
+      });
+    });
+
+    it('translates bookmark --delete NAME to branch -d NAME', () => {
+      expect(translate(['bookmark', '--delete', 'my-branch'])).toEqual({
+        args: ['branch', '-d', 'my-branch'],
+      });
+    });
+  });
 });

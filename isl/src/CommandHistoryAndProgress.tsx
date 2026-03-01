@@ -90,6 +90,13 @@ function translateArgsForDisplay(
     );
     return ['checkout', hash, '--', ...files];
   }
+  if (first === 'bookmark') {
+    if (args[1] === '--delete') return ['branch', '-d', args[2]];
+    const name = args[1];
+    const revIdx = args.indexOf('--rev');
+    const hash = revIdx !== -1 ? args[revIdx + 1] : 'HEAD';
+    return ['branch', name, hash];
+  }
   if (first === 'rebase') {
     if (args.includes('--keep')) {
       const revIdx = args.indexOf('--rev');
