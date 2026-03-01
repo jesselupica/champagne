@@ -332,11 +332,17 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
-  describe('continue', () => {
-    it('translates continue to rebase --continue', () => {
-      expect(translate(['continue'])).toEqual({
-        args: ['rebase', '--continue'],
-      });
+  describe('continue (ContinueOperation)', () => {
+    it('generates a shell script that routes to the correct --continue based on git state', () => {
+      const result = translate(['continue']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('git rev-parse --git-path');
+      expect(result.args[1]).toContain('REBASE_MERGE');
+      expect(result.args[1]).toContain('rebase --continue');
+      expect(result.args[1]).toContain('MERGE_HEAD');
+      expect(result.args[1]).toContain('commit --no-edit');
+      expect(result.args[1]).toContain('CHERRY_PICK_HEAD');
+      expect(result.args[1]).toContain('cherry-pick --continue');
     });
   });
 

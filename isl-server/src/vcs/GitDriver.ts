@@ -1189,7 +1189,18 @@ export class GitDriver implements VCSDriver {
       return {args, stdin};
     }
     if (args[0] === 'continue') {
-      return {args: ['rebase', '--continue'], stdin};
+      // Detect which operation is in progress and run the correct --continue command.
+      // Use git rev-parse --git-path for worktree safety (avoids hardcoded .git/ paths).
+      const script =
+        'REBASE_MERGE=$(git rev-parse --git-path REBASE_MERGE); ' +
+        'REBASE_APPLY=$(git rev-parse --git-path REBASE_APPLY); ' +
+        'MERGE_HEAD=$(git rev-parse --git-path MERGE_HEAD); ' +
+        'CHERRY_PICK_HEAD=$(git rev-parse --git-path CHERRY_PICK_HEAD); ' +
+        'if [ -d "$REBASE_MERGE" ] || [ -d "$REBASE_APPLY" ]; then git rebase --continue; ' +
+        'elif [ -f "$MERGE_HEAD" ]; then git commit --no-edit; ' +
+        'elif [ -f "$CHERRY_PICK_HEAD" ]; then git cherry-pick --continue; ' +
+        'else echo "No operation in progress" && exit 1; fi';
+      return {args: ['__shell__', script], stdin};
     }
     if (args[0] === 'purge') {
       const files = args.filter(a => a !== 'purge' && a !== '--files' && a !== '--abort-on-err');

@@ -159,7 +159,7 @@ function translateArgsForDisplay(
     }
     return args;
   }
-  if (first === 'continue') return ['rebase', '--continue'];
+  if (first === 'continue') return ['rebase/merge/cherry-pick', '--continue'];
   if (first === 'rebase') {
     if (args.includes('--abort')) return ['rebase', '--abort'];
     if (args.includes('--quit')) return ['rebase', '--abort', '(partial)'];
