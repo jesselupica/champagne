@@ -1062,6 +1062,12 @@ export class GitDriver implements VCSDriver {
       if (!src || !dest) throw new Error('rebase requires -s and -d');
       return {args: ['rebase', '--onto', dest, src + '^', src], stdin};
     }
+    if (args[0] === 'graft') {
+      return {args: ['cherry-pick', ...args.slice(1)], stdin};
+    }
+    if (args[0] === 'uncommit') {
+      return {args: ['reset', '--soft', 'HEAD~1'], stdin};
+    }
 
     return {args, stdin};
   }

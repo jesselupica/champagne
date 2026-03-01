@@ -115,6 +115,8 @@ function translateArgsForDisplay(
   if (first === 'unshelve') {
     return ['stash', args.includes('--keep') ? 'apply' : 'pop'];
   }
+  if (first === 'graft') return ['cherry-pick', ...args.slice(1)];
+  if (first === 'uncommit') return ['reset', '--soft', 'HEAD~1'];
   if (first === 'rebase') {
     if (args.includes('--keep')) {
       const revIdx = args.indexOf('--rev');

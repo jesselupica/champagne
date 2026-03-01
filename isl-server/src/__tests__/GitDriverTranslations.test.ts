@@ -164,4 +164,20 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('graft', () => {
+    it('translates graft HASH to cherry-pick HASH', () => {
+      expect(translate(['graft', 'abc123'])).toEqual({
+        args: ['cherry-pick', 'abc123'],
+      });
+    });
+  });
+
+  describe('uncommit', () => {
+    it('translates uncommit to reset --soft HEAD~1', () => {
+      expect(translate(['uncommit'])).toEqual({
+        args: ['reset', '--soft', 'HEAD~1'],
+      });
+    });
+  });
 });
