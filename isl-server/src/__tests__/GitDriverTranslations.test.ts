@@ -421,6 +421,22 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
+  describe('fold --exact (FoldOperation)', () => {
+    it('generates a shell script that limits squash to the exact range', () => {
+      const result = translate(['fold', '--exact', 'aaa111::bbb222', '--message', 'merged']);
+      expect(result.args[0]).toBe('__shell__');
+      // Must reference both hashes
+      expect(result.args[1]).toContain('bbb222');
+      expect(result.args[1]).toContain('aaa111');
+      expect(result.args[1]).toContain('merged');
+    });
+
+    it('script contains a rebase --onto step to replay commits above the fold range', () => {
+      const result = translate(['fold', '--exact', 'aaa111::bbb222', '--message', 'merged']);
+      expect(result.args[1]).toContain('rebase --onto');
+    });
+  });
+
   describe('pull (plain, PullOperation)', () => {
     it('translates plain pull to fetch --all (not git pull which would merge)', () => {
       expect(translate(['pull'])).toEqual({

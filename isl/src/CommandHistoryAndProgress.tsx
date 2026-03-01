@@ -48,11 +48,10 @@ function translateArgsForDisplay(
   }
   const first = args[0];
   if (first === 'fold') {
-    // fold --exact HASH1::HASH2 --message MSG → display as rebase -i BOTTOM^
     const exactIdx = args.indexOf('--exact');
     const revset = exactIdx !== -1 ? String(args[exactIdx + 1]) : '??';
-    const bottom = revset.split('::')[0] ?? '??';
-    return ['rebase', '-i', bottom + '^'];
+    const [bottom] = revset.split('::');
+    return ['reset', '--soft', bottom + '^', '&&', 'commit', '(fold)'];
   }
   if (first === 'hide') {
     const revIdx = args.indexOf('--rev');

@@ -1049,7 +1049,7 @@ export class GitDriver implements VCSDriver {
       return {args: ['rm', '--cached', ...args.slice(1)], stdin};
     }
     if (args[0] === 'fold') {
-      return this.translateFoldToGit(args);
+      return this.translateFoldToGit(args, stdin);
     }
     if (args[0] === 'hide') {
       return this.translateHideToGit(args, stdin);
@@ -1229,52 +1229,56 @@ export class GitDriver implements VCSDriver {
   }
 
   /**
-   * Translate `fold --exact HASH1::HASH2 --message MSG` into
-   * `rebase -i BOTTOM^` with:
-   * - GIT_SEQUENCE_EDITOR: sed that changes all picks after the first to `squash`
-   * - GIT_EDITOR: shell script that writes the new message to the editor file
+   * Translate `fold --exact BOTTOM::TOP --message MSG` into a shell script that:
+   * 1. Saves the current branch and HEAD tip
+   * 2. Detaches at TOP and collapses down to BOTTOM^ using reset --soft
+   * 3. Commits the folded result with the provided message
+   * 4. If there were commits above TOP, rebases them onto the new folded commit
+   * 5. Restores the branch pointer
    *
-   * The `squash` directive causes git to open the editor for the combined message.
-   * Our GIT_EDITOR replaces the editor file content with the desired message.
+   * This approach limits the squash to exactly the BOTTOM::TOP range, avoiding
+   * the bug where `rebase -i BOTTOM^` would include commits above TOP (e.g. HEAD).
    */
-  private translateFoldToGit(args: string[]): ResolvedCommand {
-    let revset: string | undefined;
-    let message: string | undefined;
-    for (let i = 1; i < args.length; i++) {
-      if (args[i] === '--exact' && i + 1 < args.length) {
-        revset = args[++i];
-      } else if (args[i] === '--message' && i + 1 < args.length) {
-        message = args[++i];
-      }
-    }
-    if (!revset || !message) {
+  private translateFoldToGit(args: string[], stdin: string | undefined): ResolvedCommand {
+    const exactIdx = args.indexOf('--exact');
+    const msgIdx = args.indexOf('--message');
+    if (exactIdx === -1 || msgIdx === -1) {
       throw new Error('fold requires --exact <revset> and --message <msg>');
     }
 
-    // Sapling revset HASH1::HASH2 — extract the bottom hash
-    const rangeMatch = /^([0-9a-f]+)::([0-9a-f]+)$/.exec(revset);
-    if (!rangeMatch) {
-      throw new Error(`fold: unsupported revset format: ${revset}`);
-    }
-    const bottomHash = rangeMatch[1];
+    const revset = String(args[exactIdx + 1]);
+    const msg = String(args[msgIdx + 1]);
+    const parts = revset.split('::');
+    if (parts.length !== 2) throw new Error(`fold: unsupported revset format: ${revset}`);
 
-    // Change every `pick` after the first line to `squash`.
-    // Use perl instead of sed -i because macOS BSD sed requires a backup
-    // extension while GNU sed does not, making sed -i non-portable.
-    const sequenceEditor = `perl -i -pe 's/^pick/squash/ if $. > 1'`;
+    const [bottomHash, topHash] = parts;
+    // Escape single quotes in message for shell
+    const escapedMsg = msg.replace(/'/g, "'\\''");
 
-    // Shell script that overwrites the commit-message editor file with our message.
-    // ISL_FOLD_MESSAGE is passed via env to avoid shell escaping issues.
-    const commitEditor = `sh -c 'printf "%s" "$ISL_FOLD_MESSAGE" > "$1"' --`;
+    // Strategy:
+    // 1. Save the current branch name and HEAD tip
+    // 2. Detach at topHash and collapse down to bottomHash^
+    // 3. Commit the folded result
+    // 4. If there were commits above topHash, rebase them onto the new fold
+    // 5. Restore the branch pointer
+    const script = [
+      `ORIG_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)`,
+      `ORIG_TIP=$(git rev-parse HEAD)`,
+      `git checkout "${topHash}"`,
+      `git reset --soft "${bottomHash}^"`,
+      `git commit --message '${escapedMsg}'`,
+      `FOLD=$(git rev-parse HEAD)`,
+      // Only rebase if there were commits above topHash
+      `if [ "$ORIG_TIP" != "${topHash}" ]; then`,
+      `  git rebase --onto $FOLD "${topHash}" $ORIG_TIP`,
+      `  NEW_TIP=$(git rev-parse HEAD)`,
+      `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; fi`,
+      `else`,
+      `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $FOLD && git checkout "$ORIG_BRANCH"; fi`,
+      `fi`,
+    ].join('\n');
 
-    return {
-      args: ['rebase', '-i', bottomHash + '^'],
-      env: {
-        GIT_SEQUENCE_EDITOR: sequenceEditor,
-        GIT_EDITOR: commitEditor,
-        ISL_FOLD_MESSAGE: message,
-      },
-    };
+    return {args: ['__shell__', script], stdin};
   }
 
   /**
