@@ -1007,13 +1007,48 @@ export class GitDriver implements VCSDriver {
       return {args: out, stdin};
     }
     if (args[0] === 'metaedit') {
-      const out: string[] = [...configArgs, 'commit', '--amend'];
+      let hash: string | undefined;
+      let msg: string | undefined;
+      let author: string | undefined;
       for (let i = 1; i < args.length; i++) {
-        if (args[i] === '--rev') { i++; continue; }  // drop --rev HASH
-        if (args[i] === '--user') { out.push('--author', args[++i]); continue; }
-        out.push(args[i]);
+        if (args[i] === '--rev' && i + 1 < args.length) hash = args[++i];
+        else if (args[i] === '--message' && i + 1 < args.length) msg = args[++i];
+        else if (args[i] === '--user' && i + 1 < args.length) author = args[++i];
       }
-      return {args: out, stdin};
+      if (!msg) throw new Error('metaedit requires --message');
+
+      const escapedMsg = msg.replace(/'/g, "'\\''");
+      const authorFlag = author ? ` --author '${author.replace(/'/g, "'\\''")}'` : '';
+      // TARGET is either the specified hash or HEAD (for HEAD-only amend)
+      const targetRef = hash ?? 'HEAD';
+
+      // Strategy (matches FoldOperation pattern for non-HEAD operations):
+      // 1. Save current branch and HEAD tip
+      // 2. Resolve target to full SHA (for reliable comparison)
+      // 3. Check out the target commit
+      // 4. Amend its message
+      // 5. If HEAD was above the target, rebase the stack onto the new amended commit
+      // 6. Restore the branch pointer
+      const script = [
+        `ORIG_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)`,
+        `ORIG_TIP=$(git rev-parse HEAD)`,
+        // Resolve target to full SHA so we can compare with ORIG_TIP
+        `TARGET_SHA=$(git rev-parse "${targetRef}")`,
+        `git checkout "${targetRef}"`,
+        `git commit --amend --only --message '${escapedMsg}'${authorFlag}`,
+        `NEW_HASH=$(git rev-parse HEAD)`,
+        // Only rebase stack if there were commits above the target
+        `if [ "$ORIG_TIP" != "$TARGET_SHA" ]; then`,
+        // $NEW_HASH, $TARGET_SHA, $ORIG_TIP are intentionally unquoted — single SHAs, word-split is harmless
+        `  git rebase --onto $NEW_HASH $TARGET_SHA $ORIG_TIP`,
+        `  NEW_TIP=$(git rev-parse HEAD)`,
+        `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
+        `else`,
+        `  if [ -n "$ORIG_BRANCH" ]; then git checkout "$ORIG_BRANCH"; fi`,
+        `fi`,
+      ].join('\n');
+
+      return {args: ['__shell__', script], stdin};
     }
     if (args[0] === 'goto') {
       if (args.includes('--clean')) {

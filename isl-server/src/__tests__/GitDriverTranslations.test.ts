@@ -93,17 +93,24 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
-  describe('metaedit', () => {
-    it('translates to git commit --amend', () => {
-      expect(translate(['metaedit', '--rev', 'abc123', '--message', 'new msg'])).toEqual({
-        args: ['commit', '--amend', '--message', 'new msg'],
-      });
+  describe('metaedit (AmendMessageOperation)', () => {
+    it('amends a non-HEAD commit by checking it out, amending, then rebasing the stack', () => {
+      const result = translate(['metaedit', '--rev', 'abc123', '--message', 'new msg']);
+      expect(result.args[0]).toBe('__shell__');
+      const script = result.args[1] as string;
+      expect(script).toContain('checkout "abc123"');
+      expect(script).toContain('commit --amend');
+      expect(script).toContain('new msg');
+      expect(script).toContain('rebase --onto');
+      // checkout must come before amend
+      expect(script.indexOf('checkout "abc123"')).toBeLessThan(script.indexOf('commit --amend'));
     });
 
-    it('renames --user to --author', () => {
-      expect(translate(['metaedit', '--rev', 'abc123', '--user', 'Bob <b@c.com>', '--message', 'msg'])).toEqual({
-        args: ['commit', '--amend', '--author', 'Bob <b@c.com>', '--message', 'msg'],
-      });
+    it('includes --author when --user is provided', () => {
+      const result = translate(['metaedit', '--rev', 'abc123', '--user', 'Bob <b@c.com>', '--message', 'msg']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('--author');
+      expect(result.args[1]).toContain('Bob');
     });
   });
 
