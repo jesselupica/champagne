@@ -993,6 +993,44 @@ export class GitDriver implements VCSDriver {
       return {args: [...configArgs, ...args.filter(a => a !== '--addremove')], stdin};
     }
     if (args[0] === 'amend') {
+      // AmendToOperation: sl amend --to <target> [files...]
+      const toIdx = args.indexOf('--to');
+      if (toIdx !== -1) {
+        const target = args[toIdx + 1];
+        if (!target) throw new Error('amend --to requires a target commit');
+        const files = args.filter((a, i, arr) =>
+          a !== 'amend' && a !== '--to' && arr[i - 1] !== '--to',
+        );
+        const stashFiles = files.length > 0 ? `-- ${files.map(f => `"${f.replace(/"/g, '\\"')}"`).join(' ')}` : '';
+        const escapedTarget = target.replace(/"/g, '\\"');
+
+        const script = [
+          'set -e',
+          `ORIG_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)`,
+          `ORIG_TIP=$(git rev-parse HEAD)`,
+          `TARGET_SHA=$(git rev-parse "${escapedTarget}")`,
+          `git stash push ${stashFiles}`,
+          `git checkout "${escapedTarget}"`,
+          `git stash pop`,
+          files.length > 0
+            ? `git add ${files.map(f => `"${f.replace(/"/g, '\\"')}"`).join(' ')}`
+            : `git add -A`,
+          `git commit --amend --no-edit`,
+          `NEW_TARGET=$(git rev-parse HEAD)`,
+          // If there were commits above the target, rebase them onto the new amended commit
+          `if [ "$ORIG_TIP" != "$TARGET_SHA" ]; then`,
+          `  git rebase --onto $NEW_TARGET $TARGET_SHA $ORIG_TIP`,
+          `  NEW_TIP=$(git rev-parse HEAD)`,
+          `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
+          `else`,
+          // HEAD case: force-update branch pointer to new amended commit
+          `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TARGET && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TARGET; fi`,
+          `fi`,
+        ].join('\n');
+
+        return {args: ['__shell__', script], stdin};
+      }
+
       const out: string[] = [...configArgs, 'commit', '--amend'];
       let hasMessage = false;
       for (let i = 1; i < args.length; i++) {

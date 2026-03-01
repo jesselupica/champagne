@@ -540,6 +540,31 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
+  describe('amend --to (AmendToOperation)', () => {
+    it('generates a stash/checkout/amend/rebase chain', () => {
+      const result = translate(['amend', '--to', 'abc123', 'file.txt']);
+      expect(result.args[0]).toBe('__shell__');
+      const script = result.args[1] as string;
+      expect(script).toContain('git stash push');
+      expect(script).toContain('"abc123"');
+      expect(script).toContain('git stash pop');
+      expect(script).toContain('commit --amend');
+      expect(script).toContain('rebase --onto');
+      // ordering: stash before checkout, checkout before stash pop, stash pop before amend
+      expect(script.indexOf('git stash push')).toBeLessThan(script.indexOf('checkout'));
+      expect(script.indexOf('checkout')).toBeLessThan(script.indexOf('git stash pop'));
+      expect(script.indexOf('git stash pop')).toBeLessThan(script.indexOf('commit --amend'));
+    });
+
+    it('works with no specific files (amend all stashed changes)', () => {
+      const result = translate(['amend', '--to', 'abc123']);
+      expect(result.args[0]).toBe('__shell__');
+      const script = result.args[1] as string;
+      expect(script).toContain('"abc123"');
+      expect(script).toContain('commit --amend');
+    });
+  });
+
   describe('pull (plain, PullOperation)', () => {
     it('translates plain pull to fetch --all (not git pull which would merge)', () => {
       expect(translate(['pull'])).toEqual({
