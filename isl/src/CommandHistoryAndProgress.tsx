@@ -183,6 +183,10 @@ function translateArgsForDisplay(
       if ((args[i] === '-s' || args[i] === '--source') && i + 1 < args.length) src = args[i + 1];
       else if ((args[i] === '-d' || args[i] === '--dest') && i + 1 < args.length) dest = args[i + 1];
     }
+    // RebaseAllDraftCommitsOperation display
+    if (typeof src === 'string' && src.startsWith('draft()')) {
+      return ['rebase', '--onto', dest ?? '??', '$(merge-base)', 'HEAD'];
+    }
     const srcStr =
       typeof src === 'string'
         ? src

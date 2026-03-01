@@ -174,6 +174,22 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
+  describe('rebase -s draft() (RebaseAllDraftCommitsOperation)', () => {
+    it('translates draft() source to merge-base shell script', () => {
+      const result = translate(['rebase', '-s', 'draft()', '-d', 'abc123']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('merge-base');
+      expect(result.args[1]).toContain('rebase --onto "abc123"');
+    });
+
+    it('also handles draft()&date(-7) source', () => {
+      const result = translate(['rebase', '-s', 'draft()&date(-7)', '-d', 'abc123']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('merge-base');
+      expect(result.args[1]).toContain('rebase --onto "abc123"');
+    });
+  });
+
   describe('rebase --abort', () => {
     it('generates a shell script that detects the in-progress operation and aborts it', () => {
       const result = translate(['rebase', '--abort']);

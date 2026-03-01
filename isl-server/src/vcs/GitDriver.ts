@@ -1144,6 +1144,19 @@ export class GitDriver implements VCSDriver {
         else if ((args[i] === '-d' || args[i] === '--dest') && i + 1 < args.length) dest = args[++i];
       }
       if (!src || !dest) throw new Error('rebase requires -s and -d');
+
+      // RebaseAllDraftCommitsOperation: src is a Sapling revset like draft() or draft()&date(-N)
+      if (src.startsWith('draft()')) {
+        // "draft commits" = commits not yet on any remote tracking branch
+        // Find the merge-base with origin, then rebase everything above it
+        const script =
+          `BASE=$(git merge-base HEAD origin/HEAD 2>/dev/null || ` +
+          `git merge-base HEAD origin/main 2>/dev/null || ` +
+          `git rev-list --max-parents=0 HEAD | tail -1) && ` +
+          `git rebase --onto "${dest}" $BASE HEAD`;
+        return {args: ['__shell__', script], stdin};
+      }
+
       return {args: ['rebase', '--onto', dest, src + '^', src], stdin};
     }
     if (args[0] === 'graft') {
