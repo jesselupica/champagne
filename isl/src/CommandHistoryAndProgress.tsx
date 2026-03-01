@@ -53,6 +53,16 @@ function translateArgsForDisplay(
   if (first === 'commit') {
     return args.filter(a => a !== '--addremove');
   }
+  if (first === 'amend') {
+    const out: typeof args = ['commit', '--amend'];
+    for (let i = 1; i < args.length; i++) {
+      const a = args[i];
+      if (a === '--addremove') continue;
+      if (a === '--user') { out.push('--author', args[i + 1]); i++; continue; }
+      out.push(a);
+    }
+    return out;
+  }
   return args;
 }
 

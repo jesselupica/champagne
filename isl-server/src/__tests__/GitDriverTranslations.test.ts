@@ -46,4 +46,18 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('amend', () => {
+    it('translates to git commit --amend', () => {
+      expect(translate(['amend', '--addremove', '--message', 'updated'])).toEqual({
+        args: ['commit', '--amend', '--message', 'updated'],
+      });
+    });
+
+    it('renames --user to --author', () => {
+      expect(translate(['amend', '--user', 'Alice <a@b.com>', '--message', 'msg'])).toEqual({
+        args: ['commit', '--amend', '--author', 'Alice <a@b.com>', '--message', 'msg'],
+      });
+    });
+  });
 });

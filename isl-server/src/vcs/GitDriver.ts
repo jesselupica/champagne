@@ -964,6 +964,15 @@ export class GitDriver implements VCSDriver {
     if (args[0] === 'commit') {
       return {args: args.filter(a => a !== '--addremove'), stdin};
     }
+    if (args[0] === 'amend') {
+      const out: string[] = ['commit', '--amend'];
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--addremove') continue;
+        if (args[i] === '--user') { out.push('--author', args[++i]); continue; }
+        out.push(args[i]);
+      }
+      return {args: out, stdin};
+    }
     if (args[0] === 'forget') {
       // `sl forget <file>` → `git rm --cached <file>`
       return {args: ['rm', '--cached', ...args.slice(1)], stdin};
