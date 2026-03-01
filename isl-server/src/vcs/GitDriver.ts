@@ -1314,7 +1314,7 @@ export class GitDriver implements VCSDriver {
       // If the current branch is in the delete list, detach HEAD to the parent first
       `if [ -n "$CURRENT" ] && echo "$BRANCHES" | grep -qxF "$CURRENT"; then git checkout --detach "${hash}^"; fi`,
       // Delete each branch in the list
-      `echo "$BRANCHES" | while IFS= read -r b; do [ -n "$b" ] && git branch -D "$b"; done`,
+      `echo "$BRANCHES" | while IFS= read -r b; do if [ -n "$b" ]; then git branch -D "$b"; fi; done`,
     ].join(' && ');
 
     return {args: ['__shell__', script], stdin};
