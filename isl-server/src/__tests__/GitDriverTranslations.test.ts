@@ -38,9 +38,10 @@ describe('GitDriver.normalizeOperationArgs', () => {
   });
 
   describe('commit', () => {
-    it('strips --addremove', () => {
+    it('converts --addremove to --all', () => {
       expect(translate(['commit', '--addremove', '--message', 'hello'])).toEqual({
-        args: ['commit', '--message', 'hello'],
+        args: ['commit', '--all', '--message', 'hello'],
+        stdin: undefined,
       });
     });
 
