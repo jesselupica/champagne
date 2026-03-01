@@ -435,6 +435,26 @@ export class Repository {
       this.mergeConflictsEmitter.emit('change', this.mergeConflicts);
       return;
     }
+
+    // Auto-continue a rebase with no unresolved conflicts.
+    // Only on first detection (!wasAlreadyInConflicts) to avoid retrying every poll.
+    // Only for 'rebase' — merges and cherry-picks are intentional user actions.
+    if (
+      !wasAlreadyInConflicts &&
+      this.mergeConflicts?.state === 'loaded' &&
+      this.mergeConflicts.command === 'rebase' &&
+      this.mergeConflicts.files.length === 0
+    ) {
+      try {
+        await this.driver.runCommand(this.initialConnectionContext, ['rebase', '--continue']);
+        this.initialConnectionContext.logger.info('auto-continued rebase with no conflicts');
+        this.mergeConflicts = undefined;
+      } catch (err) {
+        this.initialConnectionContext.logger.error(`auto-continue rebase failed: ${err}`);
+        // fall through: emit the conflict state so the user sees the Abort UI
+      }
+    }
+
     this.initialConnectionContext.logger.info(
       `repo ${this.mergeConflicts ? 'IS' : 'IS NOT'} in merge conflicts`,
     );

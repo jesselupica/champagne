@@ -836,6 +836,207 @@ ${MARK_OUT}
       expect(onChange).toHaveBeenCalledWith(undefined);
     });
   });
+
+  describe('auto-continue rebase with no conflicts', () => {
+    const repoInfo: ValidatedRepoInfo = {
+      type: 'success',
+      command: 'git',
+      dotdir: '/path/to/repo/.git',
+      repoRoot: '/path/to/repo',
+      codeReviewSystem: {type: 'unknown'},
+      pullRequestDomain: undefined,
+      isEdenFs: false,
+    };
+
+    function makeMockDriver(overrides: {
+      hasPotentialOperation?: jest.Mock;
+      checkMergeConflicts?: jest.Mock;
+      runCommand?: jest.Mock;
+    }) {
+      // Minimal mock that satisfies the methods called by checkForMergeConflicts.
+      return {
+        hasPotentialOperation: overrides.hasPotentialOperation ?? jest.fn().mockResolvedValue(false),
+        checkMergeConflicts: overrides.checkMergeConflicts ?? jest.fn().mockResolvedValue(undefined),
+        runCommand: overrides.runCommand ?? jest.fn().mockResolvedValue({stdout: ''}),
+        // Other driver methods are not exercised by checkForMergeConflicts; provide stubs.
+        getWatchConfig: jest.fn().mockReturnValue({watchmanExpression: null, watchDirectories: []}),
+        getRepoInfo: jest.fn().mockResolvedValue({type: 'cwdDoesNotExist', cwd: '/'}),
+        fetchSmartlogCommits: jest.fn().mockResolvedValue({commits: {value: []}}),
+        fetchUncommittedChanges: jest.fn().mockResolvedValue({files: {value: []}}),
+        fetchConfig: jest.fn().mockResolvedValue(undefined),
+        fetchRepoConfig: jest.fn().mockResolvedValue({}),
+        getConfig: jest.fn().mockResolvedValue(undefined),
+        setConfig: jest.fn().mockResolvedValue(undefined),
+        getMergeTool: jest.fn().mockResolvedValue(null),
+        name: 'git',
+        command: 'git',
+        capabilities: {
+          smartlog: false, commitPhases: false, bookmarks: false, amend: false,
+          partialCommit: false, partialAmend: false, rebase: false, fold: false,
+          hide: false, shelve: false, graft: false, goto: false, stackOperations: false,
+          commitCloud: false, submodules: false, alerts: false, debugInfo: false,
+          mutationTracking: false, push: false, pullRevision: false,
+        },
+      } as unknown as import('../vcs/VCSDriver').VCSDriver;
+    }
+
+    it('auto-continues and clears state when rebase has no conflict files', async () => {
+      const runCommand = jest.fn().mockResolvedValue({stdout: ''});
+      const checkMergeConflicts = jest.fn().mockResolvedValue({
+        state: 'loaded',
+        command: 'rebase',
+        toContinue: 'rebase --continue',
+        toAbort: 'rebase --abort',
+        files: [],
+        fetchStartTimestamp: Date.now(),
+        fetchCompletedTimestamp: Date.now(),
+      });
+      const driver = makeMockDriver({
+        hasPotentialOperation: jest.fn().mockResolvedValue(true),
+        checkMergeConflicts,
+        runCommand,
+      });
+
+      const repo = new Repository(repoInfo, ctx, driver);
+      const onChange = jest.fn();
+      repo.onChangeConflictState(onChange);
+
+      await repo.checkForMergeConflicts();
+
+      expect(runCommand).toHaveBeenCalledWith(
+        expect.anything(),
+        ['rebase', '--continue'],
+      );
+      // After auto-continue succeeds, conflict state should be cleared
+      expect(repo.getMergeConflicts()).toBeUndefined();
+    });
+
+    it('does NOT auto-continue when rebase has conflict files', async () => {
+      const runCommand = jest.fn().mockResolvedValue({stdout: ''});
+      const checkMergeConflicts = jest.fn().mockResolvedValue({
+        state: 'loaded',
+        command: 'rebase',
+        toContinue: 'rebase --continue',
+        toAbort: 'rebase --abort',
+        files: [{path: 'conflict.txt', status: 'U', conflictType: 'both_changed'}],
+        fetchStartTimestamp: Date.now(),
+        fetchCompletedTimestamp: Date.now(),
+      });
+      const driver = makeMockDriver({
+        hasPotentialOperation: jest.fn().mockResolvedValue(true),
+        checkMergeConflicts,
+        runCommand,
+      });
+
+      const repo = new Repository(repoInfo, ctx, driver);
+      const onChange = jest.fn();
+      repo.onChangeConflictState(onChange);
+
+      await repo.checkForMergeConflicts();
+
+      expect(runCommand).not.toHaveBeenCalledWith(
+        expect.anything(),
+        ['rebase', '--continue'],
+      );
+      // Conflict state should still be set
+      expect(repo.getMergeConflicts()).toBeDefined();
+    });
+
+    it('does NOT auto-continue for merge (only rebase)', async () => {
+      const runCommand = jest.fn().mockResolvedValue({stdout: ''});
+      const checkMergeConflicts = jest.fn().mockResolvedValue({
+        state: 'loaded',
+        command: 'merge',
+        toContinue: 'merge --continue',
+        toAbort: 'merge --abort',
+        files: [],
+        fetchStartTimestamp: Date.now(),
+        fetchCompletedTimestamp: Date.now(),
+      });
+      const driver = makeMockDriver({
+        hasPotentialOperation: jest.fn().mockResolvedValue(true),
+        checkMergeConflicts,
+        runCommand,
+      });
+
+      const repo = new Repository(repoInfo, ctx, driver);
+      const onChange = jest.fn();
+      repo.onChangeConflictState(onChange);
+
+      await repo.checkForMergeConflicts();
+
+      expect(runCommand).not.toHaveBeenCalledWith(
+        expect.anything(),
+        ['rebase', '--continue'],
+      );
+      // Conflict state should still be set (user must resolve the merge manually)
+      expect(repo.getMergeConflicts()).toBeDefined();
+    });
+
+    it('surfaces conflict state when auto-continue fails', async () => {
+      const runCommand = jest.fn().mockRejectedValue(new Error('conflict not resolved'));
+      const conflictsValue: MergeConflicts = {
+        state: 'loaded',
+        command: 'rebase',
+        toContinue: 'rebase --continue',
+        toAbort: 'rebase --abort',
+        files: [],
+        fetchStartTimestamp: Date.now(),
+        fetchCompletedTimestamp: Date.now(),
+      };
+      const checkMergeConflicts = jest.fn().mockResolvedValue(conflictsValue);
+      const driver = makeMockDriver({
+        hasPotentialOperation: jest.fn().mockResolvedValue(true),
+        checkMergeConflicts,
+        runCommand,
+      });
+
+      const repo = new Repository(repoInfo, ctx, driver);
+      const onChange = jest.fn();
+      repo.onChangeConflictState(onChange);
+
+      await repo.checkForMergeConflicts();
+
+      expect(runCommand).toHaveBeenCalledWith(
+        expect.anything(),
+        ['rebase', '--continue'],
+      );
+      // Conflict state must be emitted so the Abort UI is shown
+      expect(repo.getMergeConflicts()).toBeDefined();
+      expect(onChange).toHaveBeenCalledWith(expect.objectContaining({state: 'loaded'}));
+    });
+
+    it('does NOT auto-continue again on second detection when already in conflicts', async () => {
+      // First call: runCommand rejects so mergeConflicts state persists
+      const runCommand = jest.fn().mockRejectedValue(new Error('conflict not resolved'));
+      const conflictsValue: MergeConflicts = {
+        state: 'loaded',
+        command: 'rebase',
+        toContinue: 'rebase --continue',
+        toAbort: 'rebase --abort',
+        files: [],
+        fetchStartTimestamp: Date.now(),
+        fetchCompletedTimestamp: Date.now(),
+      };
+      const checkMergeConflicts = jest.fn().mockResolvedValue(conflictsValue);
+      const driver = makeMockDriver({
+        hasPotentialOperation: jest.fn().mockResolvedValue(true),
+        checkMergeConflicts,
+        runCommand,
+      });
+
+      const repo = new Repository(repoInfo, ctx, driver);
+      repo.onChangeConflictState(jest.fn());
+
+      // First poll — wasAlreadyInConflicts=false, auto-continue attempted and fails
+      await repo.checkForMergeConflicts();
+      expect(runCommand).toHaveBeenCalledTimes(1);
+
+      // Second poll — wasAlreadyInConflicts=true now, should NOT retry
+      await repo.checkForMergeConflicts();
+      expect(runCommand).toHaveBeenCalledTimes(1);
+    });
+  });
 });
 
 describe('extractRepoInfoFromUrl', () => {
