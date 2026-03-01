@@ -41,7 +41,7 @@ filename src/app.ts
 `;
 
 // Porcelain output where a commit hash appears more than once — the second occurrence
-// has no metadata block (only the hash header + filename + content line).
+// has no metadata block (hash header + content line directly (no metadata)).
 const REPEATED_HASH_OUTPUT = `${HASH_A} 1 1 1
 author Alice
 author-mail <alice@example.com>
@@ -54,8 +54,7 @@ committer-tz +0000
 summary first commit
 filename src/app.ts
 \thello world
-${HASH_A} 3 2 1
-filename src/app.ts
+${HASH_A} 3 2
 \tanother line by Alice
 `;
 
