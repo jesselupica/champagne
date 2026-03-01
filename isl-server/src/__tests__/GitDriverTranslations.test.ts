@@ -404,6 +404,20 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
+  describe('hide --rev (HideOperation)', () => {
+    it('uses --contains to find descendant branches, not just --points-at', () => {
+      const result = translate(['hide', '--rev', 'abc123']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('--contains "abc123"');
+      expect(result.args[1]).not.toContain('--points-at');
+    });
+
+    it('still deletes branches and moves HEAD away if needed', () => {
+      const result = translate(['hide', '--rev', 'abc123']);
+      expect(result.args[1]).toContain('branch -D');
+    });
+  });
+
   describe('pull (plain, PullOperation)', () => {
     it('translates plain pull to fetch --all (not git pull which would merge)', () => {
       expect(translate(['pull'])).toEqual({

@@ -1052,7 +1052,7 @@ export class GitDriver implements VCSDriver {
       return this.translateFoldToGit(args);
     }
     if (args[0] === 'hide') {
-      return this.translateHideToGit(args);
+      return this.translateHideToGit(args, stdin);
     }
     if (args[0] === 'pull') {
       if (args.includes('--rev')) {
@@ -1301,32 +1301,23 @@ export class GitDriver implements VCSDriver {
    * already unreachable from branch refs and we just need to ensure HEAD
    * isn't on it.
    */
-  private translateHideToGit(args: string[]): ResolvedCommand {
-    let hash: string | undefined;
-    for (let i = 1; i < args.length; i++) {
-      if (args[i] === '--rev' && i + 1 < args.length) {
-        hash = args[++i];
-      }
-    }
-    if (!hash) {
-      throw new Error('hide requires --rev <hash>');
-    }
+  private translateHideToGit(args: string[], stdin: string | undefined): ResolvedCommand {
+    const revIdx = args.indexOf('--rev');
+    if (revIdx === -1) throw new Error('hide requires --rev <hash>');
+    const hash = args[revIdx + 1];
 
-    // Shell script: find branches at this hash, delete them.
-    // If HEAD is detached at this hash, move to parent first.
-    // Uses sh -c so we can run multiple git commands.
+    // If HEAD is currently at the hidden commit (or a descendant), move to the
+    // hidden commit's parent first so we don't delete the checked-out branch.
+    // Then delete all branches that contain the hidden commit in their history
+    // (this covers the commit itself and all its draft descendants).
     const script = [
-      // Move HEAD to parent if detached at this commit
-      `if [ "$(git rev-parse HEAD)" = "${hash}" ]; then git checkout --detach ${hash}^; fi`,
-      // Delete all local branches pointing at this commit
-      `for b in $(git for-each-ref --format="%(refname:short)" --points-at ${hash} refs/heads/); do git branch -D "$b"; done`,
+      // Move HEAD away if it points to the hidden commit or a descendant
+      `if git merge-base --is-ancestor "${hash}" HEAD 2>/dev/null; then git checkout --detach "${hash}^"; fi`,
+      // Delete every local branch that has the hidden commit as an ancestor
+      `for b in $(git branch --contains "${hash}" --format='%(refname:short)' 2>/dev/null); do git branch -D "$b"; done`,
     ].join(' && ');
 
-    // Return as a shell command rather than a git command.
-    // getExecParams will be called with these args, but we override the command to sh.
-    return {
-      args: ['__shell__', script],
-    };
+    return {args: ['__shell__', script], stdin};
   }
 
   getExecParams(
