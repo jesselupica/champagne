@@ -60,4 +60,18 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('metaedit', () => {
+    it('translates to git commit --amend', () => {
+      expect(translate(['metaedit', '--rev', 'abc123', '--message', 'new msg'])).toEqual({
+        args: ['commit', '--amend', '--message', 'new msg'],
+      });
+    });
+
+    it('renames --user to --author', () => {
+      expect(translate(['metaedit', '--rev', 'abc123', '--user', 'Bob <b@c.com>', '--message', 'msg'])).toEqual({
+        args: ['commit', '--amend', '--author', 'Bob <b@c.com>', '--message', 'msg'],
+      });
+    });
+  });
 });

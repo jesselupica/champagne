@@ -63,6 +63,16 @@ function translateArgsForDisplay(
     }
     return out;
   }
+  if (first === 'metaedit') {
+    const out: typeof args = ['commit', '--amend'];
+    for (let i = 1; i < args.length; i++) {
+      const a = args[i];
+      if (a === '--rev') { i++; continue; }
+      if (a === '--user') { out.push('--author', args[i + 1]); i++; continue; }
+      out.push(a);
+    }
+    return out;
+  }
   return args;
 }
 
