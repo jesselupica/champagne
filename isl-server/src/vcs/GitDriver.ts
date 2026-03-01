@@ -1014,6 +1014,24 @@ export class GitDriver implements VCSDriver {
     if (args[0] === 'pull' && args.includes('--rev')) {
       return this.translatePullRevToGit(args);
     }
+    if (args[0] === 'rebase') {
+      if (args.includes('--keep')) {
+        // RebaseKeepOperation: copy without moving → cherry-pick
+        const revIdx = args.indexOf('--rev');
+        const src = revIdx !== -1 ? args[revIdx + 1] : undefined;
+        if (!src) throw new Error('rebase --keep requires --rev');
+        return {args: ['cherry-pick', src], stdin};
+      }
+      // Standard rebase: -s SRC -d DEST → rebase --onto DEST SRC^ SRC
+      let src: string | undefined;
+      let dest: string | undefined;
+      for (let i = 1; i < args.length; i++) {
+        if ((args[i] === '-s' || args[i] === '--source') && i + 1 < args.length) src = args[++i];
+        else if ((args[i] === '-d' || args[i] === '--dest') && i + 1 < args.length) dest = args[++i];
+      }
+      if (!src || !dest) throw new Error('rebase requires -s and -d');
+      return {args: ['rebase', '--onto', dest, src + '^', src], stdin};
+    }
 
     return {args, stdin};
   }

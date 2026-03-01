@@ -102,4 +102,18 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('rebase', () => {
+    it('translates rebase -s SRC -d DEST to rebase --onto DEST SRC^ SRC', () => {
+      expect(translate(['rebase', '-s', 'abc123', '-d', 'def456'])).toEqual({
+        args: ['rebase', '--onto', 'def456', 'abc123^', 'abc123'],
+      });
+    });
+
+    it('translates rebase --keep --rev SRC --dest DEST to cherry-pick', () => {
+      expect(translate(['rebase', '--keep', '--rev', 'abc123', '--dest', 'def456'])).toEqual({
+        args: ['cherry-pick', 'abc123'],
+      });
+    });
+  });
 });

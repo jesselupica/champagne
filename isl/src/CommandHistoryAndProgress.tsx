@@ -90,6 +90,20 @@ function translateArgsForDisplay(
     );
     return ['checkout', hash, '--', ...files];
   }
+  if (first === 'rebase') {
+    if (args.includes('--keep')) {
+      const revIdx = args.indexOf('--rev');
+      const src = revIdx !== -1 ? args[revIdx + 1] : '??';
+      return ['cherry-pick', src];
+    }
+    let src: typeof args[0] = '??';
+    let dest: typeof args[0] = '??';
+    for (let i = 1; i < args.length; i++) {
+      if ((args[i] === '-s' || args[i] === '--source') && i + 1 < args.length) src = args[i + 1];
+      else if ((args[i] === '-d' || args[i] === '--dest') && i + 1 < args.length) dest = args[i + 1];
+    }
+    return ['rebase', '--onto', dest, String(src) + '^', src];
+  }
   return args;
 }
 
