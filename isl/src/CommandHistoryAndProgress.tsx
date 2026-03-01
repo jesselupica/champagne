@@ -165,7 +165,10 @@ function translateArgsForDisplay(
     if (args.includes('--quit')) return ['rebase', '--abort', '(partial)'];
     if (args.includes('--keep')) {
       const revIdx = args.indexOf('--rev');
+      const destIdx = Math.max(args.indexOf('--dest'), args.indexOf('-d'));
       const src = revIdx !== -1 ? args[revIdx + 1] : '??';
+      const dest = destIdx !== -1 ? args[destIdx + 1] : null;
+      if (dest) return ['checkout', dest, '&&', 'cherry-pick', src];
       return ['cherry-pick', src];
     }
     if (args.includes('--rev') && !args.includes('-s') && !args.includes('--source')) {

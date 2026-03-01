@@ -142,9 +142,20 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
 
-    it('translates rebase --keep --rev SRC --dest DEST to cherry-pick', () => {
-      expect(translate(['rebase', '--keep', '--rev', 'abc123', '--dest', 'def456'])).toEqual({
+  });
+
+  describe('rebase --keep with --dest (RebaseKeepOperation)', () => {
+    it('checks out destination before cherry-pick when --dest is provided', () => {
+      const result = translate(['rebase', '--keep', '--rev', 'abc123', '--dest', 'def456']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('checkout "def456"');
+      expect(result.args[1]).toContain('cherry-pick "abc123"');
+    });
+
+    it('falls back to direct cherry-pick when --dest is absent', () => {
+      expect(translate(['rebase', '--keep', '--rev', 'abc123'])).toEqual({
         args: ['cherry-pick', 'abc123'],
+        stdin: undefined,
       });
     });
   });

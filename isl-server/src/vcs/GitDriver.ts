@@ -1116,10 +1116,15 @@ export class GitDriver implements VCSDriver {
         return {args: ['__shell__', script], stdin};
       }
       if (args.includes('--keep')) {
-        // RebaseKeepOperation: copy without moving → cherry-pick
         const revIdx = args.indexOf('--rev');
+        const destIdx = Math.max(args.indexOf('--dest'), args.indexOf('-d'));
         const src = revIdx !== -1 ? args[revIdx + 1] : undefined;
+        const dest = destIdx !== -1 ? args[destIdx + 1] : undefined;
         if (!src) throw new Error('rebase --keep requires --rev');
+        if (dest) {
+          // Quote src and dest to prevent shell injection
+          return {args: ['__shell__', `git checkout "${dest}" && git cherry-pick "${src}"`], stdin};
+        }
         return {args: ['cherry-pick', src], stdin};
       }
       // BulkRebaseOperation: sl rebase --rev SRC1 --rev SRC2 -d DEST
