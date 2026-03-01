@@ -123,16 +123,21 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
-  describe('goto', () => {
-    it('translates goto --rev HASH to checkout HASH', () => {
-      expect(translate(['goto', '--rev', 'abc123'])).toEqual({
-        args: ['checkout', 'abc123'],
-      });
+  describe('goto (GotoOperation)', () => {
+    it('generates a stash/checkout/pop script to carry uncommitted changes', () => {
+      const result = translate(['goto', '--rev', 'abc123']);
+      expect(result.args[0]).toBe('__shell__');
+      const script = result.args[1] as string;
+      expect(script).toContain('checkout');
+      expect(script).toContain('abc123');
+      expect(script).toContain('stash');
     });
 
-    it('translates goto --clean . to checkout -- .', () => {
+    // --clean case is unchanged
+    it('translates goto --clean . to checkout -- . (unchanged)', () => {
       expect(translate(['goto', '--clean', '.'])).toEqual({
         args: ['checkout', '--', '.'],
+        stdin: undefined,
       });
     });
   });

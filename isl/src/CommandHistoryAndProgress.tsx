@@ -109,7 +109,7 @@ function translateArgsForDisplay(
     }
     const revIdx = args.indexOf('--rev');
     const hash = revIdx !== -1 ? args[revIdx + 1] : args[1];
-    return ['checkout', hash];
+    return ['checkout', hash ?? ''];  // Display simplified; stash/pop is an impl detail
   }
   if (first === 'revert') {
     const revIdx = args.indexOf('--rev');

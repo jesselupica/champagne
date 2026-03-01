@@ -1061,10 +1061,24 @@ export class GitDriver implements VCSDriver {
         const files = args.filter(a => a !== 'goto' && a !== '--clean');
         return {args: ['checkout', '--', ...files], stdin};
       }
-      // goto --rev HASH → checkout HASH
+      // goto --rev HASH → stash if dirty, checkout, then pop stash
       const revIdx = args.indexOf('--rev');
       const hash = revIdx !== -1 ? args[revIdx + 1] : args[1];
-      return {args: ['checkout', hash], stdin};
+      if (!hash) throw new Error('goto requires --rev');
+
+      const script = [
+        'set -e',
+        // Count tracked changed files (exclude untracked ??); -gt 0 means stash needed
+        'HAS_CHANGES=$(git status --porcelain | grep -v "^??" | wc -l | tr -d " ")',
+        `if [ "$HAS_CHANGES" -gt 0 ]; then`,
+        `  git stash push`,
+        `  git checkout "${hash}"`,
+        `  git stash pop`,
+        `else`,
+        `  git checkout "${hash}"`,
+        `fi`,
+      ].join('\n');
+      return {args: ['__shell__', script], stdin};
     }
     if (args[0] === 'revert') {
       const revIdx = args.indexOf('--rev');
