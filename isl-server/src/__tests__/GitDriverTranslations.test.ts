@@ -153,19 +153,24 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('translates multiple --rev args to checkout + cherry-pick', () => {
       const result = translate(['rebase', '--rev', 'abc123', '--rev', 'def456', '-d', 'xyz789']);
       expect(result.args[0]).toBe('__shell__');
-      expect(result.args[1]).toContain('checkout xyz789');
-      expect(result.args[1]).toContain('cherry-pick abc123 def456');
+      expect(result.args[1]).toContain('checkout "xyz789"');
+      expect(result.args[1]).toContain('cherry-pick "abc123" "def456"');
     });
 
     it('works with a single --rev', () => {
       const result = translate(['rebase', '--rev', 'abc123', '-d', 'xyz789']);
       expect(result.args[0]).toBe('__shell__');
-      expect(result.args[1]).toContain('checkout xyz789');
-      expect(result.args[1]).toContain('cherry-pick abc123');
+      expect(result.args[1]).toContain('checkout "xyz789"');
+      expect(result.args[1]).toContain('cherry-pick "abc123"');
     });
 
     it('throws if -d is missing', () => {
       expect(() => translate(['rebase', '--rev', 'abc123'])).toThrow();
+    });
+
+    it('does not activate for args without --rev (falls through to standard rebase)', () => {
+      // Without --rev, should fall through to standard rebase path (which requires -s and -d)
+      expect(() => translate(['rebase', '-s', 'abc123', '-d', 'xyz789'])).not.toThrow('rebase --rev');
     });
   });
 

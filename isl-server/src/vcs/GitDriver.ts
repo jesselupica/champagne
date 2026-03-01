@@ -1132,7 +1132,8 @@ export class GitDriver implements VCSDriver {
           else if ((args[i] === '-d' || args[i] === '--dest') && i + 1 < args.length) dest = args[++i];
         }
         if (!dest) throw new Error('rebase --rev requires -d <dest>');
-        const script = `git checkout ${dest} && git cherry-pick ${revs.join(' ')}`;
+        if (revs.length === 0) throw new Error('rebase --rev requires at least one --rev');
+        const script = `git checkout "${dest}" && git cherry-pick ${revs.map(r => `"${r}"`).join(' ')}`;
         return {args: ['__shell__', script], stdin};
       }
       // Standard rebase: -s SRC -d DEST → rebase --onto DEST SRC^ SRC
