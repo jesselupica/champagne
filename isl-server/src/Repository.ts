@@ -446,7 +446,11 @@ export class Repository {
       this.mergeConflicts.files.length === 0
     ) {
       try {
-        await this.driver.runCommand(this.initialConnectionContext, ['rebase', '--continue']);
+        await this.driver.runCommand(this.initialConnectionContext, ['rebase', '--continue'], {
+          // GIT_EDITOR=true lets `git rebase --continue` use the prepared commit message
+          // without blocking on an editor (overrides the default GIT_EDITOR=false).
+          env: {GIT_EDITOR: 'true'},
+        });
         this.initialConnectionContext.logger.info('auto-continued rebase with no conflicts');
         this.mergeConflicts = undefined;
       } catch (err) {

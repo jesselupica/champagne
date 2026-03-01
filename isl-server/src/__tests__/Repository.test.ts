@@ -906,6 +906,7 @@ ${MARK_OUT}
       expect(runCommand).toHaveBeenCalledWith(
         expect.anything(),
         ['rebase', '--continue'],
+        expect.objectContaining({env: expect.objectContaining({GIT_EDITOR: 'true'})}),
       );
       // After auto-continue succeeds, conflict state should be cleared
       expect(repo.getMergeConflicts()).toBeUndefined();
@@ -1000,6 +1001,7 @@ ${MARK_OUT}
       expect(runCommand).toHaveBeenCalledWith(
         expect.anything(),
         ['rebase', '--continue'],
+        expect.objectContaining({env: expect.objectContaining({GIT_EDITOR: 'true'})}),
       );
       // Conflict state must be emitted so the Abort UI is shown
       expect(repo.getMergeConflicts()).toBeDefined();
