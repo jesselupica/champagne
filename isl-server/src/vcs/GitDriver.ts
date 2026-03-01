@@ -160,7 +160,7 @@ export class GitDriver implements VCSDriver {
 
     const result: RepoInfo = {
       type: 'success',
-      command: cmd,
+      command: 'git',
       dotdir,
       repoRoot,
       codeReviewSystem,
@@ -192,6 +192,24 @@ export class GitDriver implements VCSDriver {
       }
     } catch {
       // No remotes, everything is draft
+    }
+
+    // Also mark commits reachable from the trunk branch (main/master) as public.
+    // This ensures the trunk line always appears on the leftmost column in the graph,
+    // regardless of whether a remote exists.
+    const TRUNK_BRANCH_NAMES = ['main', 'master'];
+    for (const trunkBranch of TRUNK_BRANCH_NAMES) {
+      try {
+        const trunkResult = await this.runCommand(ctx, ['rev-list', trunkBranch]);
+        for (const line of trunkResult.stdout.trim().split('\n')) {
+          if (line) {
+            publicHashes.add(line);
+          }
+        }
+        break; // Found trunk branch, stop looking
+      } catch {
+        // Branch doesn't exist, try next name
+      }
     }
 
     // Step 2: Get HEAD hash for isDot marking
@@ -943,6 +961,13 @@ export class GitDriver implements VCSDriver {
     }
 
     // Translate Sapling-style commands to git equivalents
+    if (args[0] === 'commit') {
+      return {args: args.filter(a => a !== '--addremove'), stdin};
+    }
+    if (args[0] === 'forget') {
+      // `sl forget <file>` → `git rm --cached <file>`
+      return {args: ['rm', '--cached', ...args.slice(1)], stdin};
+    }
     if (args[0] === 'fold') {
       return this.translateFoldToGit(args);
     }

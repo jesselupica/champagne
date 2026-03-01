@@ -32,4 +32,18 @@ describe('GitDriver.normalizeOperationArgs', () => {
   it('passes unknown commands through unchanged', () => {
     expect(translate(['status'])).toEqual({args: ['status']});
   });
+
+  describe('commit', () => {
+    it('strips --addremove', () => {
+      expect(translate(['commit', '--addremove', '--message', 'hello'])).toEqual({
+        args: ['commit', '--message', 'hello'],
+      });
+    });
+
+    it('passes through commit without --addremove unchanged', () => {
+      expect(translate(['commit', '--message', 'hello'])).toEqual({
+        args: ['commit', '--message', 'hello'],
+      });
+    });
+  });
 });

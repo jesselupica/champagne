@@ -35,6 +35,27 @@ import {short} from './utils';
 
 import './CommandHistoryAndProgress.css';
 
+/**
+ * Translate Sapling-style operation args to their Git equivalents for display.
+ * Mirrors the server-side normalizeOperationArgs translation in GitDriver.
+ */
+function translateArgsForDisplay(
+  args: ReturnType<Operation['getArgs']>,
+  command: string,
+): ReturnType<Operation['getArgs']> {
+  if (!command.endsWith('git')) {
+    return args;
+  }
+  const first = args[0];
+  if (first === 'forget') {
+    return ['rm', '--cached', ...args.slice(1)];
+  }
+  if (first === 'commit') {
+    return args.filter(a => a !== '--addremove');
+  }
+  return args;
+}
+
 function OperationDescription(props: {
   info: ValidatedRepoInfo;
   operation: Operation;
@@ -58,12 +79,14 @@ function OperationDescription(props: {
         : operation.runner === CommandRunner.InternalArcanist
           ? CommandRunner.InternalArcanist
           : null;
+
+  const displayArgs = translateArgsForDisplay(operation.getArgs(), info.command);
+
   return (
     <code className={className}>
       {(commandName ?? '') +
         ' ' +
-        operation
-          .getArgs()
+        displayArgs
           .map(arg => {
             if (typeof arg === 'object') {
               switch (arg.type) {
