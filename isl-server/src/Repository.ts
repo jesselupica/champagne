@@ -407,7 +407,7 @@ export class Repository {
     // Fast path: check if .sl/merge dir changed
     const wasAlreadyInConflicts = this.mergeConflicts != null;
     if (!wasAlreadyInConflicts) {
-      const mergeDirExists = await exists(path.join(this.info.dotdir, 'merge'));
+      const mergeDirExists = await this.driver.hasPotentialOperation(this.info.dotdir);
       if (!mergeDirExists) {
         this.initialConnectionContext.logger.info(
           `conflict state still the same (${
