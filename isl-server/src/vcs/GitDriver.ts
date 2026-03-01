@@ -1068,6 +1068,21 @@ export class GitDriver implements VCSDriver {
     if (args[0] === 'uncommit') {
       return {args: ['reset', '--soft', 'HEAD~1'], stdin};
     }
+    if (args[0] === 'resolve') {
+      if (args.includes('--mark')) {
+        const files = args.filter(a => a !== 'resolve' && a !== '--mark');
+        return {args: ['add', ...files], stdin};
+      }
+      if (args.includes('--unmark')) {
+        const files = args.filter(a => a !== 'resolve' && a !== '--unmark');
+        return {args: ['rm', '--cached', ...files], stdin};
+      }
+      // resolve --tool internal:dumpjson --all (conflict detection, not a user action)
+      return {args, stdin};
+    }
+    if (args[0] === 'continue') {
+      return {args: ['rebase', '--continue'], stdin};
+    }
 
     return {args, stdin};
   }

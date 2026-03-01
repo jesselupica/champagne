@@ -117,6 +117,16 @@ function translateArgsForDisplay(
   }
   if (first === 'graft') return ['cherry-pick', ...args.slice(1)];
   if (first === 'uncommit') return ['reset', '--soft', 'HEAD~1'];
+  if (first === 'resolve') {
+    if (args.includes('--mark')) {
+      return ['add', ...args.filter(a => a !== 'resolve' && a !== '--mark')];
+    }
+    if (args.includes('--unmark')) {
+      return ['rm', '--cached', ...args.filter(a => a !== 'resolve' && a !== '--unmark')];
+    }
+    return args;
+  }
+  if (first === 'continue') return ['rebase', '--continue'];
   if (first === 'rebase') {
     if (args.includes('--keep')) {
       const revIdx = args.indexOf('--rev');

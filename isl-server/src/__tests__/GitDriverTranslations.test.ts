@@ -180,4 +180,26 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('resolve', () => {
+    it('translates resolve --mark file to add file', () => {
+      expect(translate(['resolve', '--mark', 'conflict.txt'])).toEqual({
+        args: ['add', 'conflict.txt'],
+      });
+    });
+
+    it('translates resolve --unmark file to rm --cached file', () => {
+      expect(translate(['resolve', '--unmark', 'conflict.txt'])).toEqual({
+        args: ['rm', '--cached', 'conflict.txt'],
+      });
+    });
+  });
+
+  describe('continue', () => {
+    it('translates continue to rebase --continue', () => {
+      expect(translate(['continue'])).toEqual({
+        args: ['rebase', '--continue'],
+      });
+    });
+  });
 });
