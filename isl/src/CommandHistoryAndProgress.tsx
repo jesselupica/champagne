@@ -59,6 +59,9 @@ function translateArgsForDisplay(
     const hash = revIdx !== -1 ? String(args[revIdx + 1]) : '??';
     return ['branch', '-D', '<branches-at-' + hash.slice(0, 8) + '>'];
   }
+  if (first === 'pull' && !args.includes('--rev')) {
+    return ['fetch', '--all'];
+  }
   if (first === 'pull' && args.includes('--rev')) {
     const revIdx = args.indexOf('--rev');
     const hash = revIdx !== -1 ? args[revIdx + 1] : '??';

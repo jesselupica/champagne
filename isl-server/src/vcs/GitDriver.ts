@@ -1054,8 +1054,12 @@ export class GitDriver implements VCSDriver {
     if (args[0] === 'hide') {
       return this.translateHideToGit(args);
     }
-    if (args[0] === 'pull' && args.includes('--rev')) {
-      return this.translatePullRevToGit(args);
+    if (args[0] === 'pull') {
+      if (args.includes('--rev')) {
+        return this.translatePullRevToGit(args);
+      }
+      // Plain pull = fetch only (do not merge into working directory)
+      return {args: ['fetch', '--all'], stdin};
     }
     if (args[0] === 'bookmark') {
       if (args[1] === '--delete') {

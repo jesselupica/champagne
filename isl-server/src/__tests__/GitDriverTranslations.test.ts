@@ -403,6 +403,20 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('pull (plain, PullOperation)', () => {
+    it('translates plain pull to fetch --all (not git pull which would merge)', () => {
+      expect(translate(['pull'])).toEqual({
+        args: ['fetch', '--all'],
+        stdin: undefined,
+      });
+    });
+
+    it('does not affect pull --rev (PullRevOperation still works)', () => {
+      const result = translate(['pull', '--rev', 'abc123']);
+      expect(result.args).not.toContain('--all');
+    });
+  });
 });
 
 describe('GitDriver.getExecParams', () => {
