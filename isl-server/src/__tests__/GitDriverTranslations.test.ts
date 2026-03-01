@@ -88,4 +88,18 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
   });
+
+  describe('revert', () => {
+    it('translates revert --rev HASH file to checkout HASH -- file', () => {
+      expect(translate(['revert', '--rev', 'abc123', 'file.txt'])).toEqual({
+        args: ['checkout', 'abc123', '--', 'file.txt'],
+      });
+    });
+
+    it('handles multiple files', () => {
+      expect(translate(['revert', '--rev', 'abc123', 'a.txt', 'b.txt'])).toEqual({
+        args: ['checkout', 'abc123', '--', 'a.txt', 'b.txt'],
+      });
+    });
+  });
 });

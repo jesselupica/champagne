@@ -993,6 +993,14 @@ export class GitDriver implements VCSDriver {
       const hash = revIdx !== -1 ? args[revIdx + 1] : args[1];
       return {args: ['checkout', hash], stdin};
     }
+    if (args[0] === 'revert') {
+      const revIdx = args.indexOf('--rev');
+      const hash = revIdx !== -1 ? args[revIdx + 1] : 'HEAD';
+      const files = args.slice(1).filter((a, i, arr) =>
+        a !== '--rev' && arr[i - 1] !== '--rev'
+      );
+      return {args: ['checkout', hash, '--', ...files], stdin};
+    }
     if (args[0] === 'forget') {
       // `sl forget <file>` → `git rm --cached <file>`
       return {args: ['rm', '--cached', ...args.slice(1)], stdin};

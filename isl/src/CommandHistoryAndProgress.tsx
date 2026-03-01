@@ -82,6 +82,14 @@ function translateArgsForDisplay(
     const hash = revIdx !== -1 ? args[revIdx + 1] : args[1];
     return ['checkout', hash];
   }
+  if (first === 'revert') {
+    const revIdx = args.indexOf('--rev');
+    const hash = revIdx !== -1 ? args[revIdx + 1] : 'HEAD';
+    const files = args.slice(1).filter((a, i, arr) =>
+      a !== '--rev' && (arr[i - 1] as unknown) !== '--rev'
+    );
+    return ['checkout', hash, '--', ...files];
+  }
   return args;
 }
 
