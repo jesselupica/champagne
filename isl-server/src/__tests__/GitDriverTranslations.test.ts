@@ -1,0 +1,35 @@
+/**
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+import type {RunnableOperation} from 'isl/src/types';
+import type {ResolvedCommand} from '../vcs/types';
+import {CommandRunner} from 'isl/src/types';
+import {GitDriver} from '../vcs/GitDriver';
+
+const driver = new GitDriver();
+const cwd = '/repo';
+const repoRoot = '/repo';
+
+function makeOp(args: RunnableOperation['args'], stdin?: string): RunnableOperation {
+  return {
+    args,
+    stdin,
+    id: 'test-op',
+    runner: CommandRunner.Sapling,
+    trackEventName: 'RunOperation', // not used by normalizeOperationArgs
+  };
+}
+
+function translate(args: string[], stdin?: string): ResolvedCommand {
+  return driver.normalizeOperationArgs(cwd, repoRoot, makeOp(args, stdin));
+}
+
+describe('GitDriver.normalizeOperationArgs', () => {
+  it('passes unknown commands through unchanged', () => {
+    expect(translate(['status'])).toEqual({args: ['status']});
+  });
+});
