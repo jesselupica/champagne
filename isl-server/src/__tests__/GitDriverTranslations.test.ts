@@ -180,6 +180,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(result.args[0]).toBe('__shell__');
       expect(result.args[1]).toContain('merge-base');
       expect(result.args[1]).toContain('rebase --onto "abc123"');
+      expect(result.args[1]).toContain('$BASE HEAD');
     });
 
     it('also handles draft()&date(-7) source', () => {
@@ -187,6 +188,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(result.args[0]).toBe('__shell__');
       expect(result.args[1]).toContain('merge-base');
       expect(result.args[1]).toContain('rebase --onto "abc123"');
+      expect(result.args[1]).toContain('$BASE HEAD');
     });
   });
 
