@@ -1066,6 +1066,9 @@ export class GitDriver implements VCSDriver {
       const hash = revIdx !== -1 ? args[revIdx + 1] : args[1];
       if (!hash) throw new Error('goto requires --rev');
 
+      // Note: if the stashed changes conflict with the target commit, stash pop
+      // will leave the working directory in a conflicted state (set -e aborts at pop).
+      // This is a known limitation of the git stash approach; tracking as a follow-up.
       const script = [
         'set -e',
         // Count tracked changed files (exclude untracked ??); -gt 0 means stash needed

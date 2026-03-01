@@ -128,9 +128,17 @@ describe('GitDriver.normalizeOperationArgs', () => {
       const result = translate(['goto', '--rev', 'abc123']);
       expect(result.args[0]).toBe('__shell__');
       const script = result.args[1] as string;
-      expect(script).toContain('checkout');
-      expect(script).toContain('abc123');
-      expect(script).toContain('stash');
+      // Must have set -e for fail-fast behavior
+      expect(script).toContain('set -e');
+      // Must have conditional logic: stash if dirty, skip if clean
+      expect(script).toContain('HAS_CHANGES');
+      expect(script).toContain('git stash push');
+      expect(script).toContain('git stash pop');
+      // checkout and stash operations must reference the target hash
+      expect(script).toContain('"abc123"');
+      // stash push must come before checkout which must come before stash pop
+      expect(script.indexOf('git stash push')).toBeLessThan(script.indexOf('checkout'));
+      expect(script.indexOf('checkout')).toBeLessThan(script.indexOf('git stash pop'));
     });
 
     // --clean case is unchanged
