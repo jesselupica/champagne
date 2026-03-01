@@ -85,12 +85,15 @@ function translateArgsForDisplay(
   }
   if (first === 'amend') {
     const out: typeof args = ['commit', '--amend'];
+    let hasMessage = false;
     for (let i = 1; i < args.length; i++) {
       const a = args[i];
       if (a === '--addremove') continue;
       if (a === '--user') { out.push('--author', args[i + 1]); i++; continue; }
+      if (a === '--message') hasMessage = true;
       out.push(a);
     }
+    if (!hasMessage) out.push('--no-edit');
     return out;
   }
   if (first === 'metaedit') {
@@ -158,6 +161,8 @@ function translateArgsForDisplay(
   }
   if (first === 'continue') return ['rebase', '--continue'];
   if (first === 'rebase') {
+    if (args.includes('--abort')) return ['rebase', '--abort'];
+    if (args.includes('--quit')) return ['rebase', '--abort', '(partial)'];
     if (args.includes('--keep')) {
       const revIdx = args.indexOf('--rev');
       const src = revIdx !== -1 ? args[revIdx + 1] : '??';
@@ -169,7 +174,13 @@ function translateArgsForDisplay(
       if ((args[i] === '-s' || args[i] === '--source') && i + 1 < args.length) src = args[i + 1];
       else if ((args[i] === '-d' || args[i] === '--dest') && i + 1 < args.length) dest = args[i + 1];
     }
-    return ['rebase', '--onto', dest, String(src) + '^', src];
+    const srcStr =
+      typeof src === 'string'
+        ? src
+        : typeof src === 'object' && src != null && 'revset' in src
+          ? (src as {revset: string}).revset
+          : String(src);
+    return ['rebase', '--onto', dest, srcStr + '^', src];
   }
   return args;
 }

@@ -942,6 +942,11 @@ export class GitDriver implements VCSDriver {
   ): ResolvedCommand {
     const illegalArgs = new Set(['--git-dir', '--work-tree']);
     let stdin = operation.stdin;
+    // Collect git -c key=value global options separately from the command args.
+    // Some operations (e.g. AmendOperation) place config objects before the command
+    // in their args list. Processing them into a separate array ensures args[0] is
+    // always the command name so the translations below can identify it correctly.
+    const configArgs: string[] = [];
     const args: string[] = [];
     for (const arg of operation.args) {
       if (typeof arg === 'object') {
@@ -950,7 +955,7 @@ export class GitDriver implements VCSDriver {
             if (!(settableConfigNames as ReadonlyArray<string>).includes(arg.key)) {
               throw new Error(`config ${arg.key} not allowed`);
             }
-            args.push('-c', `${arg.key}=${arg.value}`);
+            configArgs.push('-c', `${arg.key}=${arg.value}`);
             continue;
           case 'repo-relative-file':
             args.push(path.normalize(path.relative(cwd, path.join(repoRoot, arg.path))));
@@ -985,19 +990,24 @@ export class GitDriver implements VCSDriver {
 
     // Translate Sapling-style commands to git equivalents
     if (args[0] === 'commit') {
-      return {args: args.filter(a => a !== '--addremove'), stdin};
+      return {args: [...configArgs, ...args.filter(a => a !== '--addremove')], stdin};
     }
     if (args[0] === 'amend') {
-      const out: string[] = ['commit', '--amend'];
+      const out: string[] = [...configArgs, 'commit', '--amend'];
+      let hasMessage = false;
       for (let i = 1; i < args.length; i++) {
         if (args[i] === '--addremove') continue;
         if (args[i] === '--user') { out.push('--author', args[++i]); continue; }
+        if (args[i] === '--message') hasMessage = true;
         out.push(args[i]);
       }
+      // Without --message, git commit --amend would open an editor. Use --no-edit
+      // to reuse the existing commit message without invoking any editor.
+      if (!hasMessage) out.push('--no-edit');
       return {args: out, stdin};
     }
     if (args[0] === 'metaedit') {
-      const out: string[] = ['commit', '--amend'];
+      const out: string[] = [...configArgs, 'commit', '--amend'];
       for (let i = 1; i < args.length; i++) {
         if (args[i] === '--rev') { i++; continue; }  // drop --rev HASH
         if (args[i] === '--user') { out.push('--author', args[++i]); continue; }
@@ -1023,6 +1033,16 @@ export class GitDriver implements VCSDriver {
         a !== '--rev' && arr[i - 1] !== '--rev'
       );
       return {args: ['checkout', hash, '--', ...files], stdin};
+    }
+    if (args[0] === 'addremove') {
+      // `sl addremove [files]` → `git add -- <files>` or `git add -A` for all
+      // git add handles both untracked (?) and deleted (!) files correctly
+      const files = args.slice(1);
+      if (files.length > 0) {
+        return {args: ['add', '--', ...files], stdin};
+      } else {
+        return {args: ['add', '-A'], stdin};
+      }
     }
     if (args[0] === 'forget') {
       // `sl forget <file>` → `git rm --cached <file>`
@@ -1068,6 +1088,23 @@ export class GitDriver implements VCSDriver {
       return {args: ['stash', keep ? 'apply' : 'pop'], stdin};
     }
     if (args[0] === 'rebase') {
+      // --abort: detect which operation is in progress and abort it
+      if (args.includes('--abort')) {
+        const script =
+          'if [ -d .git/REBASE_MERGE ] || [ -d .git/REBASE_APPLY ]; then git rebase --abort; ' +
+          'elif [ -f .git/MERGE_HEAD ]; then git merge --abort; ' +
+          'elif [ -f .git/CHERRY_PICK_HEAD ]; then git cherry-pick --abort; ' +
+          'else echo "No operation in progress" && exit 1; fi';
+        return {args: ['__shell__', script], stdin};
+      }
+      // --quit: save already-rebased commits, then abort (approximates sl rebase --quit)
+      if (args.includes('--quit')) {
+        const script =
+          'REWRITTEN=$(cat .git/REBASE_MERGE/rewritten-list 2>/dev/null | awk \'{print $2}\' | tr \'\\n\' \' \') && ' +
+          'git rebase --abort && ' +
+          'if [ -n "$REWRITTEN" ]; then git cherry-pick $REWRITTEN; fi';
+        return {args: ['__shell__', script], stdin};
+      }
       if (args.includes('--keep')) {
         // RebaseKeepOperation: copy without moving → cherry-pick
         const revIdx = args.indexOf('--rev');
@@ -1121,10 +1158,10 @@ export class GitDriver implements VCSDriver {
       if (rev && branch) {
         return {args: ['push', remote ?? 'origin', `${rev}:${branch}`], stdin};
       }
-      return {args, stdin};
+      return {args: [...configArgs, ...args], stdin};
     }
 
-    return {args, stdin};
+    return {args: [...configArgs, ...args], stdin};
   }
 
   /**
@@ -1234,7 +1271,13 @@ export class GitDriver implements VCSDriver {
     options_?: EjecaOptions,
     env?: Record<string, string>,
   ): {command: string; args: string[]; options: EjecaOptions} {
+    // Strip Sapling-specific global flags that git doesn't support.
+    // Repository.runOperation may prepend --verbose or --debug for sl, but
+    // git only accepts a small set of global options (not --verbose/--debug).
     const args = [...args_];
+    while (args.length > 0 && (args[0] === '--verbose' || args[0] === '--debug')) {
+      args.shift();
+    }
 
     const newEnv = {
       GIT_EDITOR: 'false',
@@ -1301,12 +1344,15 @@ export class GitDriver implements VCSDriver {
     const index = xy[0];
     const workTree = xy[1];
 
-    // Prioritize working tree changes, fall back to index
+    // Prioritize working tree changes, fall back to index.
+    // In porcelain v2:  X = index vs HEAD,  Y = working-tree vs index
     if (workTree === 'M') {
       return 'M';
     }
     if (workTree === 'D') {
-      return 'R'; // R = removed in ISL terminology
+      // File is missing from disk but the deletion has NOT been staged yet.
+      // This is Sapling's '!' (missing), not 'R' (staged removal).
+      return '!';
     }
     if (workTree === 'A') {
       return 'A';
@@ -1318,6 +1364,7 @@ export class GitDriver implements VCSDriver {
       return 'M';
     }
     if (index === 'D') {
+      // Deletion is staged in the index — this is Sapling's 'R' (removed).
       return 'R';
     }
     if (index === 'R') {

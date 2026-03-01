@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import type {RunnableOperation} from 'isl/src/types';
+import type {CommandArg, RunnableOperation} from 'isl/src/types';
 import type {ResolvedCommand} from '../vcs/types';
 import {CommandRunner} from 'isl/src/types';
 import {GitDriver} from '../vcs/GitDriver';
@@ -25,6 +25,10 @@ function makeOp(args: RunnableOperation['args'], stdin?: string): RunnableOperat
 }
 
 function translate(args: string[], stdin?: string): ResolvedCommand {
+  return driver.normalizeOperationArgs(cwd, repoRoot, makeOp(args, stdin));
+}
+
+function translateFull(args: CommandArg[], stdin?: string): ResolvedCommand {
   return driver.normalizeOperationArgs(cwd, repoRoot, makeOp(args, stdin));
 }
 
@@ -57,6 +61,34 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('renames --user to --author', () => {
       expect(translate(['amend', '--user', 'Alice <a@b.com>', '--message', 'msg'])).toEqual({
         args: ['commit', '--amend', '--author', 'Alice <a@b.com>', '--message', 'msg'],
+      });
+    });
+
+    it('adds --no-edit when no --message is given', () => {
+      expect(translate(['amend', '--addremove'])).toEqual({
+        args: ['commit', '--amend', '--no-edit'],
+      });
+    });
+
+    it('handles config arg before command (AmendOperation shape)', () => {
+      expect(translateFull([
+        {type: 'config', key: 'amend.autorestack', value: 'always_restack'},
+        'amend',
+        '--addremove',
+        '--message',
+        'msg',
+      ])).toEqual({
+        args: ['-c', 'amend.autorestack=always_restack', 'commit', '--amend', '--message', 'msg'],
+      });
+    });
+
+    it('adds --no-edit with config arg prefix when no --message', () => {
+      expect(translateFull([
+        {type: 'config', key: 'amend.autorestack', value: 'always_restack'},
+        'amend',
+        '--addremove',
+      ])).toEqual({
+        args: ['-c', 'amend.autorestack=always_restack', 'commit', '--amend', '--no-edit'],
       });
     });
   });
@@ -114,6 +146,25 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(translate(['rebase', '--keep', '--rev', 'abc123', '--dest', 'def456'])).toEqual({
         args: ['cherry-pick', 'abc123'],
       });
+    });
+  });
+
+  describe('rebase --abort', () => {
+    it('generates a shell script that detects the in-progress operation and aborts it', () => {
+      const result = translate(['rebase', '--abort']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('REBASE_MERGE');
+      expect(result.args[1]).toContain('rebase --abort');
+      expect(result.args[1]).toContain('MERGE_HEAD');
+      expect(result.args[1]).toContain('merge --abort');
+      expect(result.args[1]).toContain('CHERRY_PICK_HEAD');
+      expect(result.args[1]).toContain('cherry-pick --abort');
+    });
+
+    it('generates a shell script for --quit that saves already-rebased commits', () => {
+      const result = translate(['rebase', '--quit']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('rebase --abort');
     });
   });
 
@@ -224,6 +275,26 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
+  describe('addremove', () => {
+    it('translates addremove with specific files to git add --', () => {
+      expect(translate(['addremove', 'new.txt', 'deleted.txt'])).toEqual({
+        args: ['add', '--', 'new.txt', 'deleted.txt'],
+      });
+    });
+
+    it('translates addremove with no files to git add -A', () => {
+      expect(translate(['addremove'])).toEqual({
+        args: ['add', '-A'],
+      });
+    });
+
+    it('translates addremove with a single file', () => {
+      expect(translate(['addremove', 'untracked.txt'])).toEqual({
+        args: ['add', '--', 'untracked.txt'],
+      });
+    });
+  });
+
   describe('push', () => {
     it('translates push --rev REV --to BRANCH REMOTE to push REMOTE REV:BRANCH', () => {
       expect(translate(['push', '--rev', 'abc123', '--to', 'main', 'origin'])).toEqual({
@@ -236,5 +307,33 @@ describe('GitDriver.normalizeOperationArgs', () => {
         args: ['push', 'origin', 'abc123:main'],
       });
     });
+  });
+});
+
+describe('GitDriver.getExecParams', () => {
+  it('strips --verbose prepended by Repository.runOperation', () => {
+    const {args} = driver.getExecParams(['--verbose', 'checkout', 'abc123'], '/repo');
+    expect(args).toEqual(['checkout', 'abc123']);
+  });
+
+  it('strips --debug prepended by Repository.runOperation', () => {
+    const {args} = driver.getExecParams(['--debug', 'commit', '--message', 'hi'], '/repo');
+    expect(args).toEqual(['commit', '--message', 'hi']);
+  });
+
+  it('strips both --verbose and --debug when both are prepended', () => {
+    const {args} = driver.getExecParams(['--verbose', '--debug', 'rebase', '--onto', 'main', 'abc^', 'abc'], '/repo');
+    expect(args).toEqual(['rebase', '--onto', 'main', 'abc^', 'abc']);
+  });
+
+  it('preserves normal git args unchanged', () => {
+    const {args} = driver.getExecParams(['commit', '--verbose', '--message', 'hi'], '/repo');
+    expect(args).toEqual(['commit', '--verbose', '--message', 'hi']);
+  });
+
+  it('handles __shell__ after stripping --verbose', () => {
+    const {command, args} = driver.getExecParams(['--verbose', '__shell__', 'rm -f "file.txt"'], '/repo');
+    expect(command).toBe('sh');
+    expect(args).toEqual(['-c', 'rm -f "file.txt"']);
   });
 });
