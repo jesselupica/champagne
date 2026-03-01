@@ -1088,19 +1088,29 @@ export class GitDriver implements VCSDriver {
       return {args: ['stash', keep ? 'apply' : 'pop'], stdin};
     }
     if (args[0] === 'rebase') {
-      // --abort: detect which operation is in progress and abort it
+      // --abort: detect which operation is in progress and abort it.
+      // Uses git rev-parse --git-path to resolve paths correctly in git worktrees,
+      // where .git is a file (not a directory) pointing to the actual git dir.
       if (args.includes('--abort')) {
         const script =
-          'if [ -d .git/REBASE_MERGE ] || [ -d .git/REBASE_APPLY ]; then git rebase --abort; ' +
-          'elif [ -f .git/MERGE_HEAD ]; then git merge --abort; ' +
-          'elif [ -f .git/CHERRY_PICK_HEAD ]; then git cherry-pick --abort; ' +
+          'REBASE_MERGE=$(git rev-parse --git-path REBASE_MERGE); ' +
+          'REBASE_APPLY=$(git rev-parse --git-path REBASE_APPLY); ' +
+          'MERGE_HEAD=$(git rev-parse --git-path MERGE_HEAD); ' +
+          'CHERRY_PICK_HEAD=$(git rev-parse --git-path CHERRY_PICK_HEAD); ' +
+          'if [ -d "$REBASE_MERGE" ] || [ -d "$REBASE_APPLY" ]; then git rebase --abort; ' +
+          'elif [ -f "$MERGE_HEAD" ]; then git merge --abort; ' +
+          'elif [ -f "$CHERRY_PICK_HEAD" ]; then git cherry-pick --abort; ' +
           'else echo "No operation in progress" && exit 1; fi';
         return {args: ['__shell__', script], stdin};
       }
-      // --quit: save already-rebased commits, then abort (approximates sl rebase --quit)
+      // --quit: save already-rebased commits, then abort (approximates sl rebase --quit).
+      // Uses git rev-parse --git-path for worktree-safe path resolution.
       if (args.includes('--quit')) {
+        // Note: $REWRITTEN is intentionally unquoted so the shell word-splits the
+        // space-separated commit hashes into individual cherry-pick arguments.
         const script =
-          'REWRITTEN=$(cat .git/REBASE_MERGE/rewritten-list 2>/dev/null | awk \'{print $2}\' | tr \'\\n\' \' \') && ' +
+          'REBASE_MERGE=$(git rev-parse --git-path REBASE_MERGE); ' +
+          'REWRITTEN=$(cat "$REBASE_MERGE/rewritten-list" 2>/dev/null | awk \'{print $2}\' | tr \'\\n\' \' \') && ' +
           'git rebase --abort && ' +
           'if [ -n "$REWRITTEN" ]; then git cherry-pick $REWRITTEN; fi';
         return {args: ['__shell__', script], stdin};

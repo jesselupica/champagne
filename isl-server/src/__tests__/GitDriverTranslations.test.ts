@@ -153,6 +153,8 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('generates a shell script that detects the in-progress operation and aborts it', () => {
       const result = translate(['rebase', '--abort']);
       expect(result.args[0]).toBe('__shell__');
+      // Uses git rev-parse --git-path for worktree-safe path resolution
+      expect(result.args[1]).toContain('git rev-parse --git-path');
       expect(result.args[1]).toContain('REBASE_MERGE');
       expect(result.args[1]).toContain('rebase --abort');
       expect(result.args[1]).toContain('MERGE_HEAD');
@@ -164,6 +166,8 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('generates a shell script for --quit that saves already-rebased commits', () => {
       const result = translate(['rebase', '--quit']);
       expect(result.args[0]).toBe('__shell__');
+      // Uses git rev-parse --git-path for worktree-safe path resolution
+      expect(result.args[1]).toContain('git rev-parse --git-path');
       expect(result.args[1]).toContain('rewritten-list');
       expect(result.args[1]).toContain('rebase --abort');
       expect(result.args[1]).toContain('cherry-pick');
