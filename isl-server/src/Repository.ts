@@ -436,53 +436,6 @@ export class Repository {
       return;
     }
 
-    // Auto-continue a rebase with no unresolved conflicts.
-    // Only on first detection (!wasAlreadyInConflicts) to avoid retrying every poll.
-    // Only for 'rebase' — merges and cherry-picks are intentional user actions.
-    // Only when git-rebase-todo is empty: a non-empty todo means the user is in an active
-    // rebase (the current conflicting commit is listed there) and should click Continue
-    // themselves. A missing file means a non-git VCS or apply-style rebase — skip.
-    if (
-      !wasAlreadyInConflicts &&
-      this.mergeConflicts?.state === 'loaded' &&
-      this.mergeConflicts.command === 'rebase' &&
-      this.mergeConflicts.files.length === 0
-    ) {
-      const todoPath = path.join(this.info.dotdir, 'rebase-merge', 'git-rebase-todo');
-      let hasPendingCommits: boolean;
-      try {
-        const todoContent = await fs.promises.readFile(todoPath, 'utf8');
-        hasPendingCommits = todoContent
-          .split('\n')
-          .some(line => {
-            const trimmed = line.trim();
-            return trimmed.length > 0 && !trimmed.startsWith('#');
-          });
-      } catch {
-        // File doesn't exist (non-git VCS, rebase-apply format, etc.) — skip auto-continue.
-        hasPendingCommits = true;
-      }
-
-      if (!hasPendingCommits) {
-        try {
-          await this.driver.runCommand(this.initialConnectionContext, ['rebase', '--continue'], {
-            // GIT_EDITOR=true lets `git rebase --continue` use the prepared commit message
-            // without blocking on an editor (overrides the default GIT_EDITOR=false).
-            env: {GIT_EDITOR: 'true'},
-          });
-          this.initialConnectionContext.logger.info('auto-continued rebase with no conflicts');
-          this.mergeConflicts = undefined;
-        } catch (err) {
-          this.initialConnectionContext.logger.error(`auto-continue rebase failed: ${err}`);
-          // fall through: emit the conflict state so the user sees the Abort UI
-        }
-      } else {
-        this.initialConnectionContext.logger.info(
-          'skipping auto-continue: rebase-todo has pending commits',
-        );
-      }
-    }
-
     this.initialConnectionContext.logger.info(
       `repo ${this.mergeConflicts ? 'IS' : 'IS NOT'} in merge conflicts`,
     );

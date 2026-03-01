@@ -1112,7 +1112,10 @@ export class GitDriver implements VCSDriver {
         // Only rebase stack if there were commits above the target
         `if [ "$ORIG_TIP" != "$TARGET_SHA" ]; then`,
         // $NEW_HASH, $TARGET_SHA, $ORIG_TIP are intentionally unquoted — single SHAs, word-split is harmless
-        `  git rebase --onto $NEW_HASH $TARGET_SHA $ORIG_TIP`,
+        `  if ! git rebase --onto $NEW_HASH $TARGET_SHA $ORIG_TIP; then`,
+        `    git rebase --abort 2>/dev/null || true`,
+        `    exit 1`,
+        `  fi`,
         `  NEW_TIP=$(git rev-parse HEAD)`,
         `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
         `else`,
@@ -1395,10 +1398,10 @@ export class GitDriver implements VCSDriver {
         'REBASE_APPLY=$(git rev-parse --git-path REBASE_APPLY); ' +
         'MERGE_HEAD=$(git rev-parse --git-path MERGE_HEAD); ' +
         'CHERRY_PICK_HEAD=$(git rev-parse --git-path CHERRY_PICK_HEAD); ' +
-        'if [ -d "$REBASE_MERGE" ] || [ -d "$REBASE_APPLY" ]; then git rebase --continue; ' +
+        'if [ -d "$REBASE_MERGE" ] || [ -d "$REBASE_APPLY" ]; then GIT_EDITOR=true git rebase --continue; ' +
         // git merge --continue is equivalent but git commit --no-edit works on Git < 2.12
         'elif [ -f "$MERGE_HEAD" ]; then git commit --no-edit; ' +
-        'elif [ -f "$CHERRY_PICK_HEAD" ]; then git cherry-pick --continue; ' +
+        'elif [ -f "$CHERRY_PICK_HEAD" ]; then GIT_EDITOR=true git cherry-pick --continue; ' +
         'else echo "No operation in progress" && exit 1; fi';
       return {args: ['__shell__', script], stdin};
     }
@@ -1469,7 +1472,10 @@ export class GitDriver implements VCSDriver {
       `FOLD=$(git rev-parse HEAD)`,
       // Only rebase if there were commits above topHash
       `if [ "$ORIG_TIP" != "$TOP_SHA" ]; then`,
-      `  git rebase --onto $FOLD "${topHash}" $ORIG_TIP`,
+      `  if ! git rebase --onto $FOLD "${topHash}" $ORIG_TIP; then`,
+      `    git rebase --abort 2>/dev/null || true`,
+      `    exit 1`,
+      `  fi`,
       `  NEW_TIP=$(git rev-parse HEAD)`,
       `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
       `else`,
