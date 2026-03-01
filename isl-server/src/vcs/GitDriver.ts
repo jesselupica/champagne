@@ -1155,8 +1155,9 @@ export class GitDriver implements VCSDriver {
           `BASE=$(git merge-base HEAD origin/HEAD 2>/dev/null || ` +
           `git merge-base HEAD origin/main 2>/dev/null || ` +
           `git merge-base HEAD origin/master 2>/dev/null || ` +
-          `git rev-list --max-parents=0 HEAD | tail -1) && ` +
+          `git rev-list --max-parents=0 HEAD | tail -1) && [ -n "$BASE" ] && ` +
           `git rebase --onto "${dest}" $BASE HEAD`;
+        // $BASE is intentionally unquoted — it is a single SHA and must word-split for git rebase
         return {args: ['__shell__', script], stdin};
       }
 

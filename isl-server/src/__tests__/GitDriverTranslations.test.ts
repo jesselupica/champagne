@@ -190,6 +190,22 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(result.args[1]).toContain('rebase --onto "abc123"');
       expect(result.args[1]).toContain('$BASE HEAD');
     });
+
+    it('tries remote tracking branches in order before falling back to rev-list', () => {
+      const result = translate(['rebase', '-s', 'draft()', '-d', 'abc123']);
+      const script = result.args[1] as string;
+      const headIdx = script.indexOf('origin/HEAD');
+      const mainIdx = script.indexOf('origin/main');
+      const masterIdx = script.indexOf('origin/master');
+      const revListIdx = script.indexOf('rev-list');
+      expect(headIdx).toBeGreaterThan(-1);
+      expect(mainIdx).toBeGreaterThan(-1);
+      expect(masterIdx).toBeGreaterThan(-1);
+      expect(revListIdx).toBeGreaterThan(-1);
+      expect(headIdx).toBeLessThan(mainIdx);
+      expect(mainIdx).toBeLessThan(masterIdx);
+      expect(masterIdx).toBeLessThan(revListIdx);
+    });
   });
 
   describe('rebase --abort', () => {
