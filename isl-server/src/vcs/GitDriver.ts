@@ -1197,6 +1197,7 @@ export class GitDriver implements VCSDriver {
         'MERGE_HEAD=$(git rev-parse --git-path MERGE_HEAD); ' +
         'CHERRY_PICK_HEAD=$(git rev-parse --git-path CHERRY_PICK_HEAD); ' +
         'if [ -d "$REBASE_MERGE" ] || [ -d "$REBASE_APPLY" ]; then git rebase --continue; ' +
+        // git merge --continue is equivalent but git commit --no-edit works on Git < 2.12
         'elif [ -f "$MERGE_HEAD" ]; then git commit --no-edit; ' +
         'elif [ -f "$CHERRY_PICK_HEAD" ]; then git cherry-pick --continue; ' +
         'else echo "No operation in progress" && exit 1; fi';

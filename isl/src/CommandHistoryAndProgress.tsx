@@ -159,6 +159,7 @@ function translateArgsForDisplay(
     }
     return args;
   }
+  // Slash-separated because the actual command is determined at runtime based on git state
   if (first === 'continue') return ['rebase/merge/cherry-pick', '--continue'];
   if (first === 'rebase') {
     if (args.includes('--abort')) return ['rebase', '--abort'];
