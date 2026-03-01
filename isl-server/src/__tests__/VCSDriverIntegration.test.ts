@@ -9,7 +9,7 @@ import type {VCSDriver} from '../vcs/VCSDriver';
 import type {FetchCommitsOptions} from '../vcs/types';
 import type {RepositoryContext} from '../serverTypes';
 import type {ServerPlatform} from '../serverPlatform';
-import type {ValidatedRepoInfo} from 'isl/src/types';
+import type {RunnableOperation, ValidatedRepoInfo} from 'isl/src/types';
 
 import {execFile as execFileCb} from 'node:child_process';
 import fs from 'node:fs/promises';
@@ -337,6 +337,16 @@ function runVCSDriverTests(
         const untracked = status.find(f => f.path === 'untracked.txt');
         expect(untracked).toBeDefined();
         expect(untracked!.status).toBe('?');
+      });
+
+      it('fetchStatus detects missing (!) file deleted from disk but not staged', async () => {
+        await helpers.commit(tmpDir, 'initial', 'file.txt', 'content');
+        // Delete directly without staging — this is a '!' (missing) file in sapling terms
+        await fs.unlink(path.join(tmpDir, 'file.txt'));
+        const status = await driver.fetchStatus(ctx);
+        const missing = status.find(f => f.path === 'file.txt');
+        expect(missing).toBeDefined();
+        expect(missing!.status).toBe('!');
       });
     });
 
@@ -960,6 +970,121 @@ function runVCSDriverTests(
         const submodules = await driver.fetchSubmodules(ctx, [tmpDir]);
         expect(submodules).toBeDefined();
         expect(typeof submodules).toBe('object');
+      });
+    });
+
+    // ── File Staging Operations (end-to-end) ──────────
+
+    describe('File Staging Operations', () => {
+      /**
+       * Helper: run an operation through the full driver stack
+       * (normalizeOperationArgs → getExecParams → execFile), exactly
+       * the same way ISL does at runtime.
+       */
+      async function runOp(args: RunnableOperation['args']): Promise<void> {
+        const resolved = driver.normalizeOperationArgs(tmpDir, tmpDir, {
+          args,
+          id: 'test-op',
+          runner: 0 as any,
+          trackEventName: 'test' as any,
+        });
+        const {command, args: execArgs, options} = driver.getExecParams(
+          resolved.args,
+          tmpDir,
+          undefined,
+          resolved.env,
+        );
+        await execFile(command, execArgs, {...options, env: {...process.env, ...options.env}});
+      }
+
+      it('addremove adds a specific untracked file', async () => {
+        await helpers.commit(tmpDir, 'initial', 'existing.txt', 'content');
+        await fs.writeFile(path.join(tmpDir, 'new.txt'), 'new content');
+
+        let status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'new.txt')?.status).toBe('?');
+
+        await runOp(['addremove', {type: 'repo-relative-file', path: 'new.txt'}]);
+
+        status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'new.txt')?.status).toBe('A');
+      });
+
+      it('addremove stages deletion of a missing (!) tracked file', async () => {
+        await helpers.commit(tmpDir, 'initial', 'file.txt', 'content');
+        // Delete without staging — file becomes '!' (missing, not staged)
+        await fs.unlink(path.join(tmpDir, 'file.txt'));
+
+        let status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'file.txt')?.status).toBe('!');
+
+        await runOp(['addremove', {type: 'repo-relative-file', path: 'file.txt'}]);
+
+        status = await driver.fetchStatus(ctx);
+        // Deletion is now staged: '!' → 'R'
+        expect(status.find(f => f.path === 'file.txt')?.status).toBe('R');
+      });
+
+      it('addremove with no files stages all untracked files', async () => {
+        await helpers.commit(tmpDir, 'initial', 'existing.txt', 'content');
+        await fs.writeFile(path.join(tmpDir, 'a.txt'), 'a');
+        await fs.writeFile(path.join(tmpDir, 'b.txt'), 'b');
+
+        let status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'a.txt')?.status).toBe('?');
+        expect(status.find(f => f.path === 'b.txt')?.status).toBe('?');
+
+        await runOp(['addremove']);
+
+        status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'a.txt')?.status).toBe('A');
+        expect(status.find(f => f.path === 'b.txt')?.status).toBe('A');
+      });
+
+      it('forget stops tracking a staged file', async () => {
+        await helpers.commit(tmpDir, 'initial', 'existing.txt', 'content');
+        // Stage a new file so it shows as 'A'
+        await fs.writeFile(path.join(tmpDir, 'tracked.txt'), 'new');
+        await execFile(driver.command, ['add', 'tracked.txt'], {cwd: tmpDir});
+
+        let status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'tracked.txt')?.status).toBe('A');
+
+        await runOp(['forget', {type: 'repo-relative-file', path: 'tracked.txt'}]);
+
+        status = await driver.fetchStatus(ctx);
+        // File should be untracked now
+        expect(status.find(f => f.path === 'tracked.txt')?.status).toBe('?');
+      });
+
+      it('revert restores a modified file to HEAD content', async () => {
+        await helpers.commit(tmpDir, 'initial', 'file.txt', 'original\n');
+        await fs.writeFile(path.join(tmpDir, 'file.txt'), 'modified\n');
+
+        let status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'file.txt')?.status).toBe('M');
+
+        await runOp(['revert', {type: 'repo-relative-file-list', paths: ['file.txt']}]);
+
+        status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'file.txt')).toBeUndefined();
+
+        const content = await fs.readFile(path.join(tmpDir, 'file.txt'), 'utf-8');
+        expect(content).toBe('original\n');
+      });
+
+      it('discard cleans all working directory changes', async () => {
+        await helpers.commit(tmpDir, 'initial', 'file.txt', 'original\n');
+        await fs.writeFile(path.join(tmpDir, 'file.txt'), 'dirty\n');
+
+        let status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'file.txt')?.status).toBe('M');
+
+        // DiscardOperation sends ['goto', '--clean', '.']
+        await runOp(['goto', '--clean', '.']);
+
+        status = await driver.fetchStatus(ctx);
+        expect(status.find(f => f.path === 'file.txt')).toBeUndefined();
       });
     });
 
