@@ -528,6 +528,15 @@ export class GitDriver implements VCSDriver {
     };
   }
 
+  async hasPotentialOperation(dotdir: string): Promise<boolean> {
+    return (
+      (await exists(path.join(dotdir, 'rebase-merge'))) ||
+      (await exists(path.join(dotdir, 'rebase-apply'))) ||
+      (await exists(path.join(dotdir, 'MERGE_HEAD'))) ||
+      (await exists(path.join(dotdir, 'CHERRY_PICK_HEAD')))
+    );
+  }
+
   async lookupCommits(
     ctx: RepositoryContext,
     _codeReviewSystem: CodeReviewSystem,
@@ -1005,7 +1014,11 @@ export class GitDriver implements VCSDriver {
 
     // Translate Sapling-style commands to git equivalents
     if (args[0] === 'commit') {
-      return {args: [...configArgs, ...args.filter(a => a !== '--addremove')], stdin};
+      const hasAddremove = args.includes('--addremove');
+      const filteredArgs = args.slice(1).filter(a => a !== '--addremove');
+      // --addremove means stage all tracked modifications/deletions before committing
+      const allFlag = hasAddremove ? ['--all'] : [];
+      return {args: [...configArgs, 'commit', ...allFlag, ...filteredArgs], stdin};
     }
     if (args[0] === 'amend') {
       // AmendToOperation: sl amend --to <target> [files...]
@@ -1032,10 +1045,14 @@ export class GitDriver implements VCSDriver {
             : `git add -A`,
           `git commit --amend --no-edit`,
           `NEW_TARGET=$(git rev-parse HEAD)`,
-          // If there were commits above the target, rebase them onto the new amended commit
+          // If there were commits above the target, rebase them onto the new amended commit.
+          // Use `if !` to capture rebase failure so we can abort cleanly (POSIX sh, no trap needed).
           `if [ "$ORIG_TIP" != "$TARGET_SHA" ]; then`,
           // $NEW_TARGET, $TARGET_SHA, $ORIG_TIP, $NEW_TIP are intentionally unquoted — single SHAs, word-split is harmless
-          `  git rebase --onto $NEW_TARGET $TARGET_SHA $ORIG_TIP`,
+          `  if ! git rebase --onto $NEW_TARGET $TARGET_SHA $ORIG_TIP; then`,
+          `    git rebase --abort 2>/dev/null || true`,
+          `    exit 1`,
+          `  fi`,
           `  NEW_TIP=$(git rev-parse HEAD)`,
           `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
           `else`,

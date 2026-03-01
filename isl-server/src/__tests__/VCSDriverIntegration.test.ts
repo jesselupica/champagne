@@ -1200,6 +1200,70 @@ if (hasSapling) {
 
 if (hasGit) {
   runVCSDriverTests('Git', () => new GitDriver(), gitHelpers);
+
+  describe('Git Driver Integration Tests (Git-specific)', () => {
+    let tmpDir: string;
+    let driver: GitDriver;
+
+    beforeEach(async () => {
+      const rawTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'champagne-git-test-'));
+      tmpDir = await fs.realpath(rawTmpDir);
+      await gitHelpers.init(tmpDir);
+      driver = new GitDriver();
+    });
+
+    afterEach(async () => {
+      await fs.rm(tmpDir, {recursive: true, force: true});
+    });
+
+    describe('hasPotentialOperation', () => {
+      const getDotDir = () => path.join(tmpDir, '.git');
+
+      it('returns false when no operation is in progress', async () => {
+        await gitHelpers.commit(tmpDir, 'initial', 'file.txt', 'content');
+        expect(await driver.hasPotentialOperation(getDotDir())).toBe(false);
+      });
+
+      it('returns true when rebase-merge directory exists', async () => {
+        const dotDir = getDotDir();
+        await fs.mkdir(path.join(dotDir, 'rebase-merge'), {recursive: true});
+        expect(await driver.hasPotentialOperation(dotDir)).toBe(true);
+      });
+
+      it('returns true when rebase-apply directory exists', async () => {
+        const dotDir = getDotDir();
+        await fs.mkdir(path.join(dotDir, 'rebase-apply'), {recursive: true});
+        expect(await driver.hasPotentialOperation(dotDir)).toBe(true);
+      });
+
+      it('returns true when MERGE_HEAD file exists', async () => {
+        const dotDir = getDotDir();
+        await fs.writeFile(path.join(dotDir, 'MERGE_HEAD'), 'abc123\n');
+        expect(await driver.hasPotentialOperation(dotDir)).toBe(true);
+      });
+
+      it('returns true when CHERRY_PICK_HEAD file exists', async () => {
+        const dotDir = getDotDir();
+        await fs.writeFile(path.join(dotDir, 'CHERRY_PICK_HEAD'), 'abc123\n');
+        expect(await driver.hasPotentialOperation(dotDir)).toBe(true);
+      });
+
+      it('returns true during a real rebase conflict', async () => {
+        await gitHelpers.commit(tmpDir, 'base', 'file.txt', 'base content');
+        const hashBase = await gitHelpers.getHead(tmpDir);
+        await gitHelpers.commit(tmpDir, 'change-A', 'file.txt', 'content from A');
+        const hashA = await gitHelpers.getHead(tmpDir);
+        await gitHelpers.checkout(tmpDir, hashBase);
+        await gitHelpers.createAndCheckoutBranch(tmpDir, 'hasPotential-branch');
+        await gitHelpers.commit(tmpDir, 'change-B', 'file.txt', 'content from B');
+        try { await gitHelpers.rebase(tmpDir, hashA); } catch { /* expected */ }
+
+        expect(await driver.hasPotentialOperation(getDotDir())).toBe(true);
+
+        await gitHelpers.rebaseAbort(tmpDir);
+      });
+    });
+  });
 } else {
   describe('Git Driver Integration Tests', () => {
     it.skip('Git not available in this environment', () => {});

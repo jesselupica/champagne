@@ -119,6 +119,12 @@ export interface VCSDriver {
   ): Promise<MergeConflicts | undefined>;
 
   /**
+   * Fast check: are there signs a merge/rebase/cherry-pick might be in progress?
+   * Used as a cheap gate before calling the more expensive checkMergeConflicts.
+   */
+  hasPotentialOperation(dotdir: string): Promise<boolean>;
+
+  /**
    * Fetch details for specific commits by hash.
    * Used for blame, commit lookups, and on-demand fetching.
    */

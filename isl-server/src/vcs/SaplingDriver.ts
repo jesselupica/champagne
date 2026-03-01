@@ -286,6 +286,10 @@ export class SaplingDriver implements VCSDriver {
     return computeNewConflicts(previousConflicts ?? {state: 'loading'}, output, fetchStartTimestamp);
   }
 
+  async hasPotentialOperation(dotdir: string): Promise<boolean> {
+    return exists(path.join(dotdir, 'merge'));
+  }
+
   async lookupCommits(
     ctx: RepositoryContext,
     codeReviewSystem: CodeReviewSystem,
