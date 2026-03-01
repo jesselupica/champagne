@@ -1122,6 +1122,19 @@ export class GitDriver implements VCSDriver {
         if (!src) throw new Error('rebase --keep requires --rev');
         return {args: ['cherry-pick', src], stdin};
       }
+      // BulkRebaseOperation: sl rebase --rev SRC1 --rev SRC2 -d DEST
+      // (uses --rev, not -s; means cherry-pick each rev onto dest)
+      if (args.includes('--rev') && !args.includes('-s') && !args.includes('--source')) {
+        const revs: string[] = [];
+        let dest: string | undefined;
+        for (let i = 1; i < args.length; i++) {
+          if (args[i] === '--rev' && i + 1 < args.length) revs.push(args[++i]);
+          else if ((args[i] === '-d' || args[i] === '--dest') && i + 1 < args.length) dest = args[++i];
+        }
+        if (!dest) throw new Error('rebase --rev requires -d <dest>');
+        const script = `git checkout ${dest} && git cherry-pick ${revs.join(' ')}`;
+        return {args: ['__shell__', script], stdin};
+      }
       // Standard rebase: -s SRC -d DEST → rebase --onto DEST SRC^ SRC
       let src: string | undefined;
       let dest: string | undefined;

@@ -168,6 +168,15 @@ function translateArgsForDisplay(
       const src = revIdx !== -1 ? args[revIdx + 1] : '??';
       return ['cherry-pick', src];
     }
+    if (args.includes('--rev') && !args.includes('-s') && !args.includes('--source')) {
+      const revs: typeof args = [];
+      let dest: (typeof args)[0] = '??';
+      for (let i = 1; i < args.length; i++) {
+        if (args[i] === '--rev' && i + 1 < args.length) { revs.push(args[i + 1]); i++; continue; }
+        if ((args[i] === '-d' || args[i] === '--dest') && i + 1 < args.length) { dest = args[i + 1]; i++; continue; }
+      }
+      return ['cherry-pick', ...revs, '(onto', dest + ')'];
+    }
     let src: typeof args[0] = '??';
     let dest: typeof args[0] = '??';
     for (let i = 1; i < args.length; i++) {

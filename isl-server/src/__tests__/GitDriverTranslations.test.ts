@@ -149,6 +149,26 @@ describe('GitDriver.normalizeOperationArgs', () => {
     });
   });
 
+  describe('rebase --rev (BulkRebaseOperation)', () => {
+    it('translates multiple --rev args to checkout + cherry-pick', () => {
+      const result = translate(['rebase', '--rev', 'abc123', '--rev', 'def456', '-d', 'xyz789']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('checkout xyz789');
+      expect(result.args[1]).toContain('cherry-pick abc123 def456');
+    });
+
+    it('works with a single --rev', () => {
+      const result = translate(['rebase', '--rev', 'abc123', '-d', 'xyz789']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('checkout xyz789');
+      expect(result.args[1]).toContain('cherry-pick abc123');
+    });
+
+    it('throws if -d is missing', () => {
+      expect(() => translate(['rebase', '--rev', 'abc123'])).toThrow();
+    });
+  });
+
   describe('rebase --abort', () => {
     it('generates a shell script that detects the in-progress operation and aborts it', () => {
       const result = translate(['rebase', '--abort']);
