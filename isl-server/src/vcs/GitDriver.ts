@@ -1237,41 +1237,60 @@ export class GitDriver implements VCSDriver {
       const hasAll = args.includes('--all');
       if (toolIdx !== -1) {
         const tool = args[toolIdx + 1];
+        if (!tool) throw new Error('resolve --tool requires a tool name');
         // Find file arg: last positional that isn't a flag or the tool value
         const fileArgs = args.filter((a, i) =>
           a !== 'resolve' && a !== '--tool' && a !== tool && a !== '--all' &&
           !String(a).startsWith('-') && i !== toolIdx + 1
         );
         const file = fileArgs[0];
+        if (tool === 'internal:merge-local' || tool === 'internal:merge-other' || tool === 'internal:union') {
+          if (!file) throw new Error(`resolve --tool ${tool} requires a file argument`);
+        }
         if (tool === 'internal:merge-local') {
           const escapedFile = String(file).replace(/"/g, '\\"');
-          const script = `git checkout --ours -- "${escapedFile}" && git add "${escapedFile}"`;
+          const script = [
+            'set -e',
+            `FILE="${escapedFile}"`,
+            'git checkout --ours -- "$FILE"',
+            'git add "$FILE"',
+          ].join('\n');
           return {args: ['__shell__', script], stdin};
         }
         if (tool === 'internal:merge-other') {
           const escapedFile = String(file).replace(/"/g, '\\"');
-          const script = `git checkout --theirs -- "${escapedFile}" && git add "${escapedFile}"`;
+          const script = [
+            'set -e',
+            `FILE="${escapedFile}"`,
+            'git checkout --theirs -- "$FILE"',
+            'git add "$FILE"',
+          ].join('\n');
           return {args: ['__shell__', script], stdin};
         }
         if (tool === 'internal:union') {
           const escapedFile = String(file).replace(/"/g, '\\"');
-          const script =
-            `set -e; FILE="${escapedFile}"; ` +
-            `git show :2:"$FILE" > /tmp/git-isl-union-$$-ours; ` +
-            `git show :1:"$FILE" > /tmp/git-isl-union-$$-base; ` +
-            `git show :3:"$FILE" > /tmp/git-isl-union-$$-theirs; ` +
-            `git merge-file --union /tmp/git-isl-union-$$-ours /tmp/git-isl-union-$$-base /tmp/git-isl-union-$$-theirs || true; ` +
-            `cp /tmp/git-isl-union-$$-ours "$FILE"; ` +
-            `git add "$FILE"`;
+          const script = [
+            'set -e',
+            `FILE="${escapedFile}"`,
+            'TMPBASE=$(mktemp -t git-isl-union)',
+            'trap \'rm -f "$TMPBASE-ours" "$TMPBASE-base" "$TMPBASE-theirs"\' EXIT',
+            'git show :2:"$FILE" > "$TMPBASE-ours"',
+            'git show :1:"$FILE" > "$TMPBASE-base"',
+            'git show :3:"$FILE" > "$TMPBASE-theirs"',
+            'git merge-file --union "$TMPBASE-ours" "$TMPBASE-base" "$TMPBASE-theirs" || true',
+            'cp "$TMPBASE-ours" "$FILE"',
+            'git add "$FILE"',
+          ].join('\n');
           return {args: ['__shell__', script], stdin};
         }
         // External merge tool: git mergetool --tool=<tool> [<file>]
+        const escapedTool = tool.replace(/'/g, "'\\''");
         if (hasAll || file === undefined) {
-          const script = `git mergetool --tool=${tool}`;
+          const script = `git mergetool --tool='${escapedTool}'`;
           return {args: ['__shell__', script], stdin};
         }
         const escapedFile = String(file).replace(/"/g, '\\"');
-        const script = `git mergetool --tool=${tool} "${escapedFile}"`;
+        const script = `git mergetool --tool='${escapedTool}' "${escapedFile}"`;
         return {args: ['__shell__', script], stdin};
       }
       // resolve --all (no --tool): run mergetool on all unresolved files

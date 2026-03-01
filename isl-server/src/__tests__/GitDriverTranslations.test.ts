@@ -369,16 +369,26 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('resolve --tool internal:union merges with union strategy', () => {
       const result = translate(['resolve', '--tool', 'internal:union', 'src/foo.ts']);
       expect(result.args[0]).toBe('__shell__');
-      expect(result.args[1]).toContain('merge-file --union');
-      expect(result.args[1]).toContain('src/foo.ts');
-      expect(result.args[1]).toContain('git add');
+      const script = result.args[1] as string;
+      expect(script).toContain('merge-file --union');
+      expect(script).toContain('src/foo.ts');
+      expect(script).toContain('git add');
+      // verify correct git object stages are used
+      expect(script).toContain(':1:');  // base
+      expect(script).toContain(':2:');  // ours
+      expect(script).toContain(':3:');  // theirs
+      expect(script).toContain('cp ');  // copy result back to working tree
+    });
+
+    it('resolve --tool internal:merge-local without file throws', () => {
+      expect(() => translate(['resolve', '--tool', 'internal:merge-local'])).toThrow();
     });
 
     it('resolve --tool <external> opens mergetool', () => {
       const result = translate(['resolve', '--tool', 'vimdiff', 'src/foo.ts']);
       expect(result.args[0]).toBe('__shell__');
       expect(result.args[1]).toContain('mergetool');
-      expect(result.args[1]).toContain('--tool=vimdiff');
+      expect(result.args[1]).toContain("--tool='vimdiff'");
       expect(result.args[1]).toContain('src/foo.ts');
     });
 
@@ -386,7 +396,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       const result = translate(['resolve', '--tool', 'vimdiff', '--all']);
       expect(result.args[0]).toBe('__shell__');
       expect(result.args[1]).toContain('mergetool');
-      expect(result.args[1]).toContain('--tool=vimdiff');
+      expect(result.args[1]).toContain("--tool='vimdiff'");
       // no specific file
     });
 
