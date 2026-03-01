@@ -33,6 +33,7 @@ import type {
 } from './types';
 
 import {ConflictType, settableConfigNames} from 'isl/src/types';
+import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {ComparisonType} from 'shared/Comparison';
@@ -85,7 +86,10 @@ export class GitDriver implements VCSDriver {
   async findRoot(ctx: RepositoryContext): Promise<AbsolutePath | undefined> {
     try {
       const result = await this.runCommand(ctx, ['rev-parse', '--show-toplevel']);
-      return result.stdout.trim();
+      const rawRoot = result.stdout.trim();
+      // Resolve symlinks so that path comparisons are consistent regardless
+      // of whether the caller used a symlinked path (e.g. /var → /private/var on macOS).
+      return await fs.realpath(rawRoot);
     } catch (error) {
       if (
         ['ENOENT', 'EACCES'].includes((error as {code: string}).code)
@@ -594,9 +598,19 @@ export class GitDriver implements VCSDriver {
   ): Promise<string> {
     // Map '.' to HEAD for git
     const rev = revset === '.' ? 'HEAD' : revset;
-    // Convert absolute path to repo-relative
+    // Convert absolute path to repo-relative.
+    // Resolve symlinks on both sides so that path.relative works correctly
+    // even when the caller passes a symlinked path (e.g. /var → /private/var on macOS).
     const root = await this.findRoot(ctx);
-    const relativePath = root ? path.relative(root, filePath) : filePath;
+    let resolvedFilePath = filePath;
+    if (path.isAbsolute(filePath)) {
+      try {
+        resolvedFilePath = await fs.realpath(filePath);
+      } catch {
+        // File may not exist at this revision; use the path as-is
+      }
+    }
+    const relativePath = root ? path.relative(root, resolvedFilePath) : resolvedFilePath;
     const result = await this.runCommand(
       ctx,
       ['show', `${rev}:${relativePath}`],
@@ -611,9 +625,18 @@ export class GitDriver implements VCSDriver {
     hash: Hash,
   ): Promise<Array<{line: string; node: string}>> {
     const rev = hash === '.' ? 'HEAD' : hash;
-    // Convert absolute path to repo-relative for git
+    // Convert absolute path to repo-relative for git.
+    // Resolve symlinks on both sides so path.relative works on macOS (/var → /private/var).
     const root = await this.findRoot(ctx);
-    const relativePath = root && path.isAbsolute(filePath) ? path.relative(root, filePath) : filePath;
+    let resolvedFilePath = filePath;
+    if (path.isAbsolute(filePath)) {
+      try {
+        resolvedFilePath = await fs.realpath(filePath);
+      } catch {
+        // File may not exist yet; use as-is
+      }
+    }
+    const relativePath = root && path.isAbsolute(resolvedFilePath) ? path.relative(root, resolvedFilePath) : resolvedFilePath;
     const result = await this.runCommand(
       ctx,
       ['blame', '--porcelain', '--no-ignore-revs-file', rev, '--', relativePath],
@@ -1134,8 +1157,10 @@ export class GitDriver implements VCSDriver {
     }
     const bottomHash = rangeMatch[1];
 
-    // sed: change every `pick` after the first line to `squash`
-    const sequenceEditor = `sed -i '2,$ s/^pick/squash/'`;
+    // Change every `pick` after the first line to `squash`.
+    // Use perl instead of sed -i because macOS BSD sed requires a backup
+    // extension while GNU sed does not, making sed -i non-portable.
+    const sequenceEditor = `perl -i -pe 's/^pick/squash/ if $. > 1'`;
 
     // Shell script that overwrites the commit-message editor file with our message.
     // ISL_FOLD_MESSAGE is passed via env to avoid shell escaping issues.

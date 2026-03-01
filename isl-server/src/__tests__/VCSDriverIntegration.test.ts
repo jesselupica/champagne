@@ -184,7 +184,10 @@ function runVCSDriverTests(
     let driver: VCSDriver;
 
     beforeEach(async () => {
-      tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'champagne-test-'));
+      const rawTmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'champagne-test-'));
+      // Resolve symlinks so that path comparisons work consistently on macOS
+      // where /var is a symlink to /private/var.
+      tmpDir = await fs.realpath(rawTmpDir);
       await helpers.init(tmpDir);
       driver = createDriver();
       ctx = {
