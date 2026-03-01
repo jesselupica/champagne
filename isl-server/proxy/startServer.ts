@@ -41,7 +41,8 @@ optional arguments:
   --force          Kill any existing Sapling Web server on the specified port, then start a new server.
                    Note that this will disrupt other windows still using the previous Sapling Web server.
   --command name   Set which command to run for sl commands (default: sl)
-  --vcs-type type  Set which VCS driver to use: sapling (default) or git.
+  --vcs-type type  Set which VCS driver to use: sapling, git, or auto (default: auto).
+                   'auto' detects the VCS from the working directory.
                    When set to 'git', also defaults --command to 'git'.
   --cwd dir        Sets the current working directory, allowing changing the repo.
   --sl-version v   Set version number of sl was used to spawn the server (default: '(dev)')
@@ -83,7 +84,7 @@ type Args = {
   force: boolean;
   slVersion: string;
   command: string;
-  vcsType: 'sapling' | 'git';
+  vcsType: 'sapling' | 'git' | undefined;
   cwd: string | undefined;
   sessionId: string | undefined;
 };
@@ -105,7 +106,7 @@ export function parseArgs(args: Array<string> = process.argv.slice(2)): Args {
   let kill = false;
   let force = false;
   let command = process.env.SL ?? 'sl';
-  let vcsType: 'sapling' | 'git' = 'sapling';
+  let vcsType: 'sapling' | 'git' | undefined = undefined;
   let cwd: string | undefined = undefined;
   let slVersion = '(dev)';
   let platform: string | undefined = undefined;
