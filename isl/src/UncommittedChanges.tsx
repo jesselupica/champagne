@@ -100,6 +100,7 @@ import {
   latestHeadCommit,
   submodulePathsByRoot,
   uncommittedChangesFetchError,
+  mainCommandName,
 } from './serverAPIState';
 import {SmartActionsDropdown} from './smartActions/SmartActionsDropdown';
 import {SmartActionsMenu} from './smartActions/SmartActionsMenu';
@@ -425,6 +426,7 @@ export function UncommittedChanges({place}: {place: Place}) {
   const headCommit = useAtomValue(latestHeadCommit);
   const schema = useAtomValue(commitMessageFieldsSchema);
   const template = useAtomValue(commitMessageTemplate);
+  const cmdName = useAtomValue(mainCommandName);
 
   const conflicts = useAtomValue(optimisticMergeConflicts);
 
@@ -481,7 +483,14 @@ export function UncommittedChanges({place}: {place: Place}) {
     }
 
     const titleEl = commitTitleRef.current;
-    const title = titleEl?.value || template?.Title || temporaryCommitTitle();
+    const inputTitle = titleEl?.value?.trim();
+    // Only use temporaryCommitTitle() for Sapling, which supports editing commit messages later.
+    // For git and other VCS, require the user to type a title.
+    const title = inputTitle || template?.Title || (cmdName === 'sl' ? temporaryCommitTitle() : '');
+    if (!title) {
+      titleEl?.focus();
+      return;
+    }
     // use the template, unless a specific quick title is given
     const fields: CommitMessageFields = {...template, Title: title};
     const message = commitMessageFieldsToString(schema, fields);

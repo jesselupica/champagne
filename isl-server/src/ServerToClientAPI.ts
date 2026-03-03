@@ -1339,7 +1339,10 @@ export default class ServerToClientAPI {
     const {logger} = ctx;
     try {
       const [result, customTemplate] = await Promise.all([
-        repo.runCommand(['debugcommitmessage', 'isl'], 'FetchCommitTemplateCommand', ctx),
+        // Use driver.runCommand (not repo.runCommand) so the driver's own command is used
+        // (e.g. 'git' for GitDriver, 'sl' for SaplingDriver). repo.runCommand uses ctx.cmd
+        // which may be 'sl' even for git repos, causing sl to read .git/COMMIT_EDITMSG.
+        repo.driver.runCommand(ctx, ['debugcommitmessage', 'isl']),
         Internal.getCustomDefaultCommitTemplate?.(repo.initialConnectionContext),
       ]);
 
@@ -1359,6 +1362,10 @@ export default class ServerToClientAPI {
       });
     } catch (err) {
       logger?.error('Could not fetch commit message template', err);
+      // For VCS backends that don't support debugcommitmessage (e.g., git),
+      // send an empty template so the client's commitMessageTemplate atom
+      // gets initialized rather than staying undefined forever.
+      this.postMessage({type: 'fetchedCommitMessageTemplate', template: ''});
     }
   }
 }
