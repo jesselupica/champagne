@@ -1313,7 +1313,30 @@ export class GitDriver implements VCSDriver {
         return {args: ['__shell__', script], stdin};
       }
 
-      return {args: ['rebase', '--onto', dest, src + '^', src], stdin};
+      // Sapling's -s means "source and all descendants". Git's rebase --onto needs
+      // an explicit endpoint. Find the branch tip that descends from SRC so the
+      // entire stack is rebased, not just the single source commit.
+      const escapedSrc = src.replace(/"/g, '\\"');
+      const escapedDest = dest.replace(/"/g, '\\"');
+      const script = [
+        'set -e',
+        `SRC="${escapedSrc}"`,
+        `DEST="${escapedDest}"`,
+        // Find branch tip: look for a local branch whose tip is a strict descendant of SRC.
+        // git branch --contains lists branches that have SRC in their history;
+        // git merge-base --is-ancestor SRC TIP confirms TIP descends from SRC.
+        'TIP=""',
+        'for hash in $(git branch --contains "$SRC" --format="%(objectname)"); do',
+        '  if [ "$hash" != "$SRC" ] && git merge-base --is-ancestor "$SRC" "$hash" 2>/dev/null; then',
+        '    TIP="$hash"',
+        '    break',
+        '  fi',
+        'done',
+        // If no descendant found, SRC is the tip itself (leaf commit)
+        'if [ -z "$TIP" ]; then TIP="$SRC"; fi',
+        'git rebase --onto "$DEST" "$SRC"^ "$TIP"',
+      ].join('\n');
+      return {args: ['__shell__', script], stdin};
     }
     if (args[0] === 'graft') {
       return {args: ['cherry-pick', ...args.slice(1)], stdin};

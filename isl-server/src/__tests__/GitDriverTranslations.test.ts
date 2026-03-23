@@ -166,10 +166,14 @@ describe('GitDriver.normalizeOperationArgs', () => {
   });
 
   describe('rebase', () => {
-    it('translates rebase -s SRC -d DEST to rebase --onto DEST SRC^ SRC', () => {
-      expect(translate(['rebase', '-s', 'abc123', '-d', 'def456'])).toEqual({
-        args: ['rebase', '--onto', 'def456', 'abc123^', 'abc123'],
-      });
+    it('translates rebase -s SRC -d DEST to shell script that finds stack tip', () => {
+      const result = translate(['rebase', '-s', 'abc123', '-d', 'def456']);
+      expect(result.args[0]).toBe('__shell__');
+      // Script should find descendants of SRC and rebase the whole stack onto DEST
+      expect(result.args[1]).toContain('SRC="abc123"');
+      expect(result.args[1]).toContain('DEST="def456"');
+      expect(result.args[1]).toContain('git branch --contains "$SRC"');
+      expect(result.args[1]).toContain('git rebase --onto "$DEST" "$SRC"^ "$TIP"');
     });
 
   });
