@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+# Parse arguments
+VCS_TYPE="${1:-sapling}"
+if [[ "$VCS_TYPE" != "sapling" && "$VCS_TYPE" != "git" ]]; then
+  echo "Usage: $0 [sapling|git]"
+  echo "  Default: sapling"
+  exit 1
+fi
+
 # Capture script directory before any cd
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CHAMPAGNE_ROOT="$SCRIPT_DIR/.."
@@ -185,7 +193,7 @@ CLIENT_PID=$!
 
 # Start the ISL server in the background (so trap can catch signals)
 cd "$CHAMPAGNE_ROOT/isl-server" || exit 1
-yarn serve --dev --foreground --stdout --force --vcs-type sapling --cwd "$TEST_REPO" &
+yarn serve --dev --foreground --stdout --force --vcs-type "$VCS_TYPE" --cwd "$TEST_REPO" &
 SERVER_PID=$!
 
 # Wait for either process to exit
