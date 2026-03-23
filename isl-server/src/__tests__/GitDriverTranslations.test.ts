@@ -102,7 +102,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(script).toContain('checkout "abc123"');
       expect(script).toContain('commit --amend');
       expect(script).toContain('new msg');
-      expect(script).toContain('rebase --onto');
+      expect(script).toContain('rebase --update-refs --onto');
       // checkout must come before amend
       expect(script.indexOf('checkout "abc123"')).toBeLessThan(script.indexOf('commit --amend'));
     });
@@ -173,7 +173,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(result.args[1]).toContain('SRC="abc123"');
       expect(result.args[1]).toContain('DEST="def456"');
       expect(result.args[1]).toContain('git branch --contains "$SRC"');
-      expect(result.args[1]).toContain('git rebase --onto "$DEST" "$SRC"^ "$TIP"');
+      expect(result.args[1]).toContain('git rebase --update-refs --onto "$DEST" "$SRC"^ "$TIP"');
     });
 
   });
@@ -234,7 +234,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       const result = translate(['rebase', '-s', 'draft()', '-d', 'abc123']);
       expect(result.args[0]).toBe('__shell__');
       expect(result.args[1]).toContain('merge-base');
-      expect(result.args[1]).toContain('rebase --onto "abc123"');
+      expect(result.args[1]).toContain('rebase --update-refs --onto "abc123"');
       expect(result.args[1]).toContain('$BASE HEAD');
     });
 
@@ -242,7 +242,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       const result = translate(['rebase', '-s', 'draft()&date(-7)', '-d', 'abc123']);
       expect(result.args[0]).toBe('__shell__');
       expect(result.args[1]).toContain('merge-base');
-      expect(result.args[1]).toContain('rebase --onto "abc123"');
+      expect(result.args[1]).toContain('rebase --update-refs --onto "abc123"');
       expect(result.args[1]).toContain('$BASE HEAD');
     });
 
@@ -531,7 +531,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
     it('script contains a rebase --onto step to replay commits above the fold range', () => {
       const result = translate(['fold', '--exact', 'aaa111::bbb222', '--message', 'merged']);
       const script = result.args[1] as string;
-      expect(script).toContain('rebase --onto');
+      expect(script).toContain('rebase --update-refs --onto');
       // topHash used as the upstream exclusion boundary in rebase --onto
       expect(script).toContain('"bbb222"');
       // Conditional: only rebase if ORIG_TIP differs from topHash
@@ -555,7 +555,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(script).toContain('"abc123"');
       expect(script).toContain('git stash pop');
       expect(script).toContain('commit --amend');
-      expect(script).toContain('rebase --onto');
+      expect(script).toContain('rebase --update-refs --onto');
       // ordering: stash before checkout, checkout before stash pop, stash pop before amend
       expect(script.indexOf('git stash push')).toBeLessThan(script.indexOf('checkout'));
       expect(script.indexOf('checkout')).toBeLessThan(script.indexOf('git stash pop'));

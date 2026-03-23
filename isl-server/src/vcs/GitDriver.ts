@@ -1057,7 +1057,7 @@ export class GitDriver implements VCSDriver {
           // Use `if !` to capture rebase failure so we can abort cleanly (POSIX sh, no trap needed).
           `if [ "$ORIG_TIP" != "$TARGET_SHA" ]; then`,
           // $NEW_TARGET, $TARGET_SHA, $ORIG_TIP, $NEW_TIP are intentionally unquoted — single SHAs, word-split is harmless
-          `  if ! git rebase --onto $NEW_TARGET $TARGET_SHA $ORIG_TIP; then`,
+          `  if ! git rebase --update-refs --onto $NEW_TARGET $TARGET_SHA $ORIG_TIP; then`,
           `    git rebase --abort 2>/dev/null || true`,
           `    exit 1`,
           `  fi`,
@@ -1120,7 +1120,7 @@ export class GitDriver implements VCSDriver {
         // Only rebase stack if there were commits above the target
         `if [ "$ORIG_TIP" != "$TARGET_SHA" ]; then`,
         // $NEW_HASH, $TARGET_SHA, $ORIG_TIP are intentionally unquoted — single SHAs, word-split is harmless
-        `  if ! git rebase --onto $NEW_HASH $TARGET_SHA $ORIG_TIP; then`,
+        `  if ! git rebase --update-refs --onto $NEW_HASH $TARGET_SHA $ORIG_TIP; then`,
         `    git rebase --abort 2>/dev/null || true`,
         `    exit 1`,
         `  fi`,
@@ -1308,7 +1308,7 @@ export class GitDriver implements VCSDriver {
           `git merge-base HEAD origin/main 2>/dev/null || ` +
           `git merge-base HEAD origin/master 2>/dev/null || ` +
           `git rev-list --max-parents=0 HEAD | tail -1) && [ -n "$BASE" ] && ` +
-          `git rebase --onto "${dest}" $BASE HEAD`;
+          `git rebase --update-refs --onto "${dest}" $BASE HEAD`;
         // $BASE is intentionally unquoted — it is a single SHA and must word-split for git rebase
         return {args: ['__shell__', script], stdin};
       }
@@ -1334,7 +1334,8 @@ export class GitDriver implements VCSDriver {
         'done',
         // If no descendant found, SRC is the tip itself (leaf commit)
         'if [ -z "$TIP" ]; then TIP="$SRC"; fi',
-        'git rebase --onto "$DEST" "$SRC"^ "$TIP"',
+        // --update-refs moves any branch pointers within the rebased range
+        'git rebase --update-refs --onto "$DEST" "$SRC"^ "$TIP"',
       ].join('\n');
       return {args: ['__shell__', script], stdin};
     }
@@ -1517,7 +1518,7 @@ export class GitDriver implements VCSDriver {
       `FOLD=$(git rev-parse HEAD)`,
       // Only rebase if there were commits above topHash
       `if [ "$ORIG_TIP" != "$TOP_SHA" ]; then`,
-      `  if ! git rebase --onto $FOLD "${topHash}" $ORIG_TIP; then`,
+      `  if ! git rebase --update-refs --onto $FOLD "${topHash}" $ORIG_TIP; then`,
       `    git rebase --abort 2>/dev/null || true`,
       `    exit 1`,
       `  fi`,
