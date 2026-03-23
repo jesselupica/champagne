@@ -185,34 +185,29 @@ export class GitDriver implements VCSDriver {
   ): Promise<CommitInfo[]> {
     const {maxDraftDays, stableLocations, recommendedBookmarks} = options;
 
-    // Step 1: Get the set of public (remote-reachable) commit hashes
+    // Step 1: Get the set of public commit hashes.
+    // "Public" = commits on the trunk branch (main/master). Feature branch commits
+    // remain "draft" even if pushed to a remote, matching Sapling's phase semantics.
+    // We check origin/<trunk> first (remote truth), then fall back to local <trunk>.
     const publicHashes = new Set<string>();
-    try {
-      const remoteResult = await this.runCommand(ctx, ['rev-list', '--remotes']);
-      for (const line of remoteResult.stdout.trim().split('\n')) {
-        if (line) {
-          publicHashes.add(line);
-        }
-      }
-    } catch {
-      // No remotes, everything is draft
-    }
-
-    // Also mark commits reachable from the trunk branch (main/master) as public.
-    // This ensures the trunk line always appears on the leftmost column in the graph,
-    // regardless of whether a remote exists.
     const TRUNK_BRANCH_NAMES = ['main', 'master'];
     for (const trunkBranch of TRUNK_BRANCH_NAMES) {
-      try {
-        const trunkResult = await this.runCommand(ctx, ['rev-list', trunkBranch]);
-        for (const line of trunkResult.stdout.trim().split('\n')) {
-          if (line) {
-            publicHashes.add(line);
+      // Try remote trunk first (authoritative for public status)
+      for (const ref of [`origin/${trunkBranch}`, trunkBranch]) {
+        try {
+          const trunkResult = await this.runCommand(ctx, ['rev-list', ref]);
+          for (const line of trunkResult.stdout.trim().split('\n')) {
+            if (line) {
+              publicHashes.add(line);
+            }
           }
+          break; // Found this trunk ref, stop trying alternatives
+        } catch {
+          // Ref doesn't exist, try next
         }
-        break; // Found trunk branch, stop looking
-      } catch {
-        // Branch doesn't exist, try next name
+      }
+      if (publicHashes.size > 0) {
+        break; // Found trunk branch, stop looking for other names
       }
     }
 
