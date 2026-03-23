@@ -678,7 +678,6 @@ export class SaplingDriver implements VCSDriver {
       SL_ENCODING: 'UTF-8',
       SL_AUTOMATION: 'true',
       SL_AUTOMATION_EXCEPT: 'ghrevset,phrevset,progress,sniff,username',
-      TERM: 'dumb',
       EDITOR: undefined,
       VISUAL: undefined,
       HGUSER: undefined,
