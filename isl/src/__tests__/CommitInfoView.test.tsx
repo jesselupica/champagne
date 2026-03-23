@@ -5,7 +5,7 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-import {act, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
+import {act, cleanup, fireEvent, render, screen, waitFor, within} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from '../App';
 import {tracker} from '../analytics';
@@ -47,6 +47,16 @@ describe('CommitInfoView', () => {
   beforeEach(() => {
     resetTestMessages();
     jest.spyOn(tracker, 'track').mockImplementation(() => undefined);
+  });
+
+  afterEach(async () => {
+    // Flush pending async state updates (Jotai atoms, promises) before cleanup.
+    // Jotai atom subscriptions can trigger cascading updates across multiple ticks.
+    // Without this, state from one test (e.g., typed 'Q' in title editor) can leak
+    // into the next test's assertions.
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 10));
+    });
   });
 
   it('shows loading spinner on mount', () => {
@@ -1231,7 +1241,7 @@ describe('CommitInfoView', () => {
             userEvent.type(getDescriptionEditor(), 'Message!');
           });
 
-          clickCommitButton();
+          await clickCommitButton();
 
           // optimistic state should now be rendered, so we show a fake commit with the new title,
           // but not in editing mode anymore
