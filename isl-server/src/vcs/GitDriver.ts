@@ -34,6 +34,7 @@ import type {
 
 import {ConflictType, settableConfigNames} from 'isl/src/types';
 import fs from 'node:fs/promises';
+import {realpathSync} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {ComparisonType} from 'shared/Comparison';
@@ -961,6 +962,18 @@ export class GitDriver implements VCSDriver {
   ): ResolvedCommand {
     const illegalArgs = new Set(['--git-dir', '--work-tree']);
     let stdin = operation.stdin;
+    // Resolve symlinks in cwd and repoRoot so path.relative works correctly
+    // (e.g. macOS /tmp -> /private/tmp). Without this, path.relative produces
+    // paths like "../../private/tmp/..." that escape the repo.
+    let resolvedCwd: string;
+    let resolvedRepoRoot: string;
+    try {
+      resolvedCwd = realpathSync(cwd);
+      resolvedRepoRoot = realpathSync(repoRoot);
+    } catch {
+      resolvedCwd = cwd;
+      resolvedRepoRoot = repoRoot;
+    }
     // Collect git -c key=value global options separately from the command args.
     // Some operations (e.g. AmendOperation) place config objects before the command
     // in their args list. Processing them into a separate array ensures args[0] is
@@ -977,12 +990,12 @@ export class GitDriver implements VCSDriver {
             configArgs.push('-c', `${arg.key}=${arg.value}`);
             continue;
           case 'repo-relative-file':
-            args.push(path.normalize(path.relative(cwd, path.join(repoRoot, arg.path))));
+            args.push(path.normalize(path.relative(resolvedCwd, path.join(resolvedRepoRoot, arg.path))));
             continue;
           case 'repo-relative-file-list':
             // Git doesn't have listfile0, pass files individually
             for (const p of arg.paths) {
-              args.push(path.normalize(path.relative(cwd, path.join(repoRoot, p))));
+              args.push(path.normalize(path.relative(resolvedCwd, path.join(resolvedRepoRoot, p))));
             }
             continue;
           case 'exact-revset':
@@ -1222,9 +1235,11 @@ export class GitDriver implements VCSDriver {
       // Uses git rev-parse --git-path to resolve paths correctly in git worktrees,
       // where .git is a file (not a directory) pointing to the actual git dir.
       if (args.includes('--abort')) {
+        // Note: git's internal directory names are lowercase (rebase-merge, rebase-apply)
+        // while sentinel files are uppercase (MERGE_HEAD, CHERRY_PICK_HEAD).
         const script =
-          'REBASE_MERGE=$(git rev-parse --git-path REBASE_MERGE); ' +
-          'REBASE_APPLY=$(git rev-parse --git-path REBASE_APPLY); ' +
+          'REBASE_MERGE=$(git rev-parse --git-path rebase-merge); ' +
+          'REBASE_APPLY=$(git rev-parse --git-path rebase-apply); ' +
           'MERGE_HEAD=$(git rev-parse --git-path MERGE_HEAD); ' +
           'CHERRY_PICK_HEAD=$(git rev-parse --git-path CHERRY_PICK_HEAD); ' +
           'if [ -d "$REBASE_MERGE" ] || [ -d "$REBASE_APPLY" ]; then git rebase --abort; ' +
@@ -1239,7 +1254,7 @@ export class GitDriver implements VCSDriver {
         // Note: $REWRITTEN is intentionally unquoted so the shell word-splits the
         // space-separated commit hashes into individual cherry-pick arguments.
         const script =
-          'REBASE_MERGE=$(git rev-parse --git-path REBASE_MERGE); ' +
+          'REBASE_MERGE=$(git rev-parse --git-path rebase-merge); ' +
           'REWRITTEN=$(cat "$REBASE_MERGE/rewritten-list" 2>/dev/null | awk \'{print $2}\' | tr \'\\n\' \' \') && ' +
           'git rebase --abort && ' +
           'if [ -n "$REWRITTEN" ]; then git cherry-pick $REWRITTEN; fi';
@@ -1335,21 +1350,31 @@ export class GitDriver implements VCSDriver {
         }
         if (tool === 'internal:merge-local') {
           const escapedFile = String(file).replace(/"/g, '\\"');
+          // For delete/modify conflicts, --ours may fail if our side deleted the file.
+          // In that case, "take ours" means accept the deletion (git rm).
           const script = [
             'set -e',
             `FILE="${escapedFile}"`,
-            'git checkout --ours -- "$FILE"',
-            'git add "$FILE"',
+            'if git checkout --ours -- "$FILE" 2>/dev/null; then',
+            '  git add "$FILE"',
+            'else',
+            '  git rm -f "$FILE" 2>/dev/null || git add "$FILE"',
+            'fi',
           ].join('\n');
           return {args: ['__shell__', script], stdin};
         }
         if (tool === 'internal:merge-other') {
           const escapedFile = String(file).replace(/"/g, '\\"');
+          // For delete/modify conflicts, --theirs may fail if their side deleted the file.
+          // In that case, "take theirs" means accept the deletion (git rm).
           const script = [
             'set -e',
             `FILE="${escapedFile}"`,
-            'git checkout --theirs -- "$FILE"',
-            'git add "$FILE"',
+            'if git checkout --theirs -- "$FILE" 2>/dev/null; then',
+            '  git add "$FILE"',
+            'else',
+            '  git rm -f "$FILE" 2>/dev/null || git add "$FILE"',
+            'fi',
           ].join('\n');
           return {args: ['__shell__', script], stdin};
         }
@@ -1388,9 +1413,11 @@ export class GitDriver implements VCSDriver {
     if (args[0] === 'continue') {
       // Detect which operation is in progress and run the correct --continue command.
       // Use git rev-parse --git-path for worktree safety (avoids hardcoded .git/ paths).
+      // Note: git's internal directory names are lowercase (rebase-merge, rebase-apply)
+      // while sentinel files are uppercase (MERGE_HEAD, CHERRY_PICK_HEAD).
       const script =
-        'REBASE_MERGE=$(git rev-parse --git-path REBASE_MERGE); ' +
-        'REBASE_APPLY=$(git rev-parse --git-path REBASE_APPLY); ' +
+        'REBASE_MERGE=$(git rev-parse --git-path rebase-merge); ' +
+        'REBASE_APPLY=$(git rev-parse --git-path rebase-apply); ' +
         'MERGE_HEAD=$(git rev-parse --git-path MERGE_HEAD); ' +
         'CHERRY_PICK_HEAD=$(git rev-parse --git-path CHERRY_PICK_HEAD); ' +
         'if [ -d "$REBASE_MERGE" ] || [ -d "$REBASE_APPLY" ]; then GIT_EDITOR=true git rebase --continue; ' +
