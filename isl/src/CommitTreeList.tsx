@@ -18,9 +18,9 @@ import {Commit, InlineProgressSpan} from './Commit';
 import {Center, LargeSpinner} from './ComponentUtils';
 import {FetchingAdditionalCommitsRow} from './FetchAdditionalCommitsButton';
 import {isHighlightedCommit} from './HighlightedCommits';
-import {RegularGlyph, RenderDag, YouAreHereGlyph} from './RenderDag';
+import {MainHeadGlyph, RegularGlyph, RenderDag, YouAreHereGlyph} from './RenderDag';
 import {StackActions} from './StackActions';
-import {YOU_ARE_HERE_VIRTUAL_COMMIT} from './dag/virtualCommit';
+import {MAIN_HEAD_VIRTUAL_COMMIT, YOU_ARE_HERE_VIRTUAL_COMMIT} from './dag/virtualCommit';
 import {T, t} from './i18n';
 import {atomFamilyWeak, localStorageBackedAtom} from './jotaiUtils';
 import {CreateEmptyInitialCommitOperation} from './operations/CreateEmptyInitialCommitOperation';
@@ -50,6 +50,15 @@ const dagWithYouAreHere = atom(get => {
   const dot = dag.resolve('.');
   if (dot != null) {
     dag = dag.add([YOU_ARE_HERE_VIRTUAL_COMMIT.set('parents', [dot.hash])]);
+  }
+  // Insert a virtual "main head" dummy node as a child of main/master.
+  const mainHead =
+    dag.resolve('remote/main') ??
+    dag.resolve('remote/master') ??
+    dag.resolve('main') ??
+    dag.resolve('master');
+  if (mainHead != null) {
+    dag = dag.add([MAIN_HEAD_VIRTUAL_COMMIT.set('parents', [mainHead.hash])]);
   }
   return dag;
 });
@@ -96,6 +105,9 @@ function DagCommitList(props: DagCommitListProps) {
 }
 
 function renderCommit(info: DagCommitInfo) {
+  if (info.isMainHead) {
+    return <></>;
+  }
   return <DagCommitBody info={info} />;
 }
 
@@ -113,6 +125,8 @@ function renderCommitExtras(info: DagCommitInfo, row: ExtendedGraphRow) {
 function renderGlyph(info: DagCommitInfo): RenderGlyphResult {
   if (info.isYouAreHere) {
     return ['replace-tile', <YouAreHereGlyphWithProgress info={info} />];
+  } else if (info.isMainHead) {
+    return ['inside-tile', <MainHeadGlyph />];
   } else {
     return ['inside-tile', <HighlightedGlyph info={info} />];
   }

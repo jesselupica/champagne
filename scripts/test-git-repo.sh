@@ -1,6 +1,10 @@
 #!/bin/bash
 set -e
 
+# Capture script directory before any cd
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHAMPAGNE_ROOT="$SCRIPT_DIR/.."
+
 # Create test repository in /tmp
 TEST_REPO="/tmp/champagne-git-test-$(date +%s)"
 echo "Creating test Git repository at: $TEST_REPO"
@@ -63,12 +67,80 @@ git commit -m "Fix navbar collapse issue"
 # Go back to main
 git checkout main
 
+# --- Merge conflict branches ---
+# First, create a shared base file on main that both branches will modify
+echo "line 1: shared header" > conflict-demo.txt
+echo "line 2: original content" >> conflict-demo.txt
+echo "line 3: more content" >> conflict-demo.txt
+echo "function hello() { return 'hello'; }" > utils.js
+echo "config: default" > settings.cfg
+git add conflict-demo.txt utils.js settings.cfg
+git commit -m "Add shared files for conflict demo"
+
+# Branch: onto-me-for-merge-conflict (the rebase destination)
+git checkout -b onto-me-for-merge-conflict main
+
+# 1. Content conflict: modify same lines in conflict-demo.txt
+echo "line 1: shared header" > conflict-demo.txt
+echo "line 2: ONTO version of content" >> conflict-demo.txt
+echo "line 3: more content" >> conflict-demo.txt
+git add conflict-demo.txt
+
+# 2. Delete/modify conflict: delete utils.js
+git rm utils.js
+
+# 3. Add/add conflict: create a new file both branches will add
+echo "created by onto-me branch" > new-feature.txt
+git add new-feature.txt
+
+# 4. Rename conflict: rename settings.cfg
+git mv settings.cfg config.yaml
+git commit -m "Onto-me changes: edit content, delete utils, add new-feature, rename settings"
+
+# Branch: rebase-me (the branch to rebase)
+git checkout -b rebase-me main
+
+# 1. Content conflict: modify same lines differently in conflict-demo.txt
+echo "line 1: shared header" > conflict-demo.txt
+echo "line 2: REBASE-ME version of content" >> conflict-demo.txt
+echo "line 3: more content" >> conflict-demo.txt
+git add conflict-demo.txt
+
+# 2. Delete/modify conflict: modify utils.js (other branch deleted it)
+echo "function hello() { return 'hi there'; }" > utils.js
+git add utils.js
+
+# 3. Add/add conflict: create same file with different content
+echo "created by rebase-me branch" > new-feature.txt
+git add new-feature.txt
+
+# 4. Rename conflict: rename settings.cfg to something different
+git mv settings.cfg preferences.ini
+git commit -m "Rebase-me changes: edit content, modify utils, add new-feature, rename settings"
+
+# Go back to main
+git checkout main
+
+# Create a bare remote and push all branches so remote tracking works
+BARE_REMOTE="/tmp/champagne-remote-$(date +%s)"
+git clone --bare . "$BARE_REMOTE"
+git remote add origin "$BARE_REMOTE"
+git fetch origin
+# Set up tracking for all branches
+for branch in main feature/login feature/dashboard bugfix/navbar onto-me-for-merge-conflict rebase-me; do
+  git branch --set-upstream-to="origin/$branch" "$branch" 2>/dev/null || true
+done
+
 echo ""
 echo "✓ Test repository created with:"
 echo "  - main branch (3 commits)"
 echo "  - feature/login branch (2 commits)"
 echo "  - feature/dashboard branch (2 commits)"
 echo "  - bugfix/navbar branch (1 commit)"
+echo "  - onto-me-for-merge-conflict branch (1 commit, rebase target)"
+echo "  - rebase-me branch (1 commit, rebase this onto the above for conflicts)"
+echo "  Conflict types: content, delete/modify, add/add, rename/rename"
+echo "  - bare remote at: $BARE_REMOTE"
 echo ""
 echo "Repository location: $TEST_REPO"
 echo ""
@@ -92,7 +164,29 @@ echo "The server URL will be printed below (use it after configuring the proxy):
 echo "========================================"
 echo ""
 
-# Start the dev server from the champagne root with Git driver
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR/../isl-server" || exit 1
-yarn serve --dev --foreground --stdout --force --vcs-type git --cwd "$TEST_REPO"
+# Start the client (Vite) and server
+
+# Graceful shutdown: kill child processes on exit/signal
+cleanup() {
+  echo ""
+  echo "Shutting down..."
+  [ -n "$CLIENT_PID" ] && kill "$CLIENT_PID" 2>/dev/null
+  [ -n "$SERVER_PID" ] && kill "$SERVER_PID" 2>/dev/null
+  wait 2>/dev/null
+  echo "Done."
+  exit 0
+}
+trap cleanup INT TERM EXIT
+
+# Start Vite client in the background
+cd "$CHAMPAGNE_ROOT/isl" || exit 1
+yarn start &
+CLIENT_PID=$!
+
+# Start the ISL server in the background (so trap can catch signals)
+cd "$CHAMPAGNE_ROOT/isl-server" || exit 1
+yarn serve --dev --foreground --stdout --force --vcs-type sapling --cwd "$TEST_REPO" &
+SERVER_PID=$!
+
+# Wait for either process to exit
+wait

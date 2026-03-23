@@ -45,6 +45,7 @@ import {
   CommitCloudBackupStatus,
   settableConfigNames,
 } from 'isl/src/types';
+import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {revsetArgsForComparison} from 'shared/Comparison';
@@ -253,7 +254,57 @@ export class SaplingDriver implements VCSDriver {
 
     attachStableLocations(commits, stableLocations);
 
+    // For git-backed repos, ensure the main/master branch appears as a bookmark.
+    // Sapling doesn't report the default git branch (e.g. "main") as a bookmark,
+    // so we detect it from git and inject it.
+    await this.injectGitMainBranchBookmark(ctx, commits);
+
     return commits;
+  }
+
+  /**
+   * Detect the git main/master branch and add it as a bookmark on the matching commit.
+   * Sapling doesn't expose the default git branch as a bookmark, so we read it from git directly.
+   */
+  private async injectGitMainBranchBookmark(
+    ctx: RepositoryContext,
+    commits: CommitInfo[],
+  ): Promise<void> {
+    try {
+      // Get the default branch name (e.g. "main" or "master")
+      const branchResult = await ejeca('git', ['symbolic-ref', '--short', 'HEAD'], {
+        cwd: ctx.cwd,
+      });
+      const branchName = branchResult.stdout.trim();
+      if (!branchName) {
+        return;
+      }
+
+      // Check if any commit already has this as a bookmark
+      const alreadyHasBookmark = commits.some(
+        c =>
+          c.bookmarks.includes(branchName) ||
+          c.remoteBookmarks.includes(branchName) ||
+          c.remoteBookmarks.includes(`remote/${branchName}`),
+      );
+      if (alreadyHasBookmark) {
+        return;
+      }
+
+      // Get the hash this branch points to
+      const hashResult = await ejeca('git', ['rev-parse', branchName], {
+        cwd: ctx.cwd,
+      });
+      const branchHash = hashResult.stdout.trim();
+
+      // Find the commit and add the bookmark
+      const commit = commits.find(c => c.hash === branchHash);
+      if (commit) {
+        commit.bookmarks = [...commit.bookmarks, branchName];
+      }
+    } catch {
+      // Not a git repo or git not available — skip silently
+    }
   }
 
   async fetchStatus(ctx: RepositoryContext): Promise<ChangedFile[]> {
@@ -550,6 +601,17 @@ export class SaplingDriver implements VCSDriver {
     const illegalArgs = new Set(['--cwd', '--config', '--insecure', '--repository', '-R']);
     let stdin = operation.stdin;
     const args: string[] = [];
+    // Resolve symlinks in cwd and repoRoot so path.relative works correctly
+    // (e.g. macOS /tmp -> /private/tmp)
+    let resolvedCwd: string;
+    let resolvedRepoRoot: string;
+    try {
+      resolvedCwd = fs.realpathSync(cwd);
+      resolvedRepoRoot = fs.realpathSync(repoRoot);
+    } catch {
+      resolvedCwd = cwd;
+      resolvedRepoRoot = repoRoot;
+    }
     for (const arg of operation.args) {
       if (typeof arg === 'object') {
         switch (arg.type) {
@@ -560,7 +622,7 @@ export class SaplingDriver implements VCSDriver {
             args.push('--config', `${arg.key}=${arg.value}`);
             continue;
           case 'repo-relative-file':
-            args.push(path.normalize(path.relative(cwd, path.join(repoRoot, arg.path))));
+            args.push(path.normalize(path.relative(resolvedCwd, path.join(resolvedRepoRoot, arg.path))));
             continue;
           case 'repo-relative-file-list':
             args.push('listfile0:-');
@@ -568,7 +630,7 @@ export class SaplingDriver implements VCSDriver {
               throw new Error('stdin already set when using repo-relative-file-list');
             }
             stdin = arg.paths
-              .map(p => path.normalize(path.relative(cwd, path.join(repoRoot, p))))
+              .map(p => path.normalize(path.relative(resolvedCwd, path.join(resolvedRepoRoot, p))))
               .join('\0');
             continue;
           case 'exact-revset':
@@ -616,6 +678,7 @@ export class SaplingDriver implements VCSDriver {
       SL_ENCODING: 'UTF-8',
       SL_AUTOMATION: 'true',
       SL_AUTOMATION_EXCEPT: 'ghrevset,phrevset,progress,sniff,username',
+      TERM: 'dumb',
       EDITOR: undefined,
       VISUAL: undefined,
       HGUSER: undefined,

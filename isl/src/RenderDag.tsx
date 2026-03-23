@@ -715,6 +715,23 @@ export function YouAreHereGlyph({info, children}: {info: DagCommitInfo; children
   );
 }
 
+/** A hollow circle glyph for the virtual main head dummy node. */
+export function MainHeadGlyph() {
+  const r = DEFAULT_GLYPH_RADIUS;
+  const strokeWidth = defaultStrokeWidth * 0.9;
+  return (
+    <circle
+      cx={0}
+      cy={0}
+      r={r}
+      fill="var(--background)"
+      stroke="var(--foreground)"
+      strokeWidth={strokeWidth}
+      strokeDasharray={`${strokeWidth * 2} ${strokeWidth * 2}`}
+    />
+  );
+}
+
 export function defaultRenderGlyph(info: DagCommitInfo): RenderGlyphResult {
   if (info.isYouAreHere) {
     return ['replace-tile', <YouAreHereGlyph info={info} />];

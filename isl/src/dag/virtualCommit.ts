@@ -14,6 +14,25 @@ import {DagCommitInfo} from './dagCommitInfo';
  */
 export const WDIR_NODE = 'ffffffffffffffffffffffffffffffffffffffff';
 
+/** Virtual hash for the main head dummy node. */
+export const MAIN_HEAD_NODE = 'eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
+
+export const MAIN_HEAD_VIRTUAL_COMMIT: DagCommitInfo = DagCommitInfo.fromCommitInfo({
+  hash: MAIN_HEAD_NODE,
+  title: '',
+  parents: [],
+  phase: 'public',
+  isDot: false,
+  date: new Date(8640000000000000),
+  bookmarks: [],
+  remoteBookmarks: [],
+  author: '',
+  description: '',
+  filePathsSample: [],
+  totalFileCount: 0,
+  isMainHead: true,
+});
+
 export const YOU_ARE_HERE_VIRTUAL_COMMIT: DagCommitInfo = DagCommitInfo.fromCommitInfo({
   hash: WDIR_NODE,
   title: '',
