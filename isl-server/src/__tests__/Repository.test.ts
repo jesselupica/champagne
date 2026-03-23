@@ -739,8 +739,8 @@ ${MARK_OUT}
         toContinue: 'rebase --continue',
         toAbort: 'rebase --abort',
         files: [
-          {path: 'file_del1.txt', status: 'U', conflictType: 'source_deleted'},
-          {path: 'file_del2.txt', status: 'U', conflictType: 'dest_deleted'},
+          {path: 'file_del1.txt', status: 'U', conflictType: 'deleted_by_source'},
+          {path: 'file_del2.txt', status: 'U', conflictType: 'deleted_by_dest'},
         ],
         fetchStartTimestamp: expect.anything(),
         fetchCompletedTimestamp: expect.anything(),

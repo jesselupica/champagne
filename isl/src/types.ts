@@ -615,8 +615,12 @@ export enum GeneratedStatus {
 
 export enum ConflictType {
   BothChanged = 'both_changed',
-  DeletedInDest = 'dest_deleted',
-  DeletedInSource = 'source_deleted',
+  BothAdded = 'both_added',
+  BothDeleted = 'both_deleted',
+  DeletedByDest = 'deleted_by_dest',
+  DeletedBySource = 'deleted_by_source',
+  AddedByDest = 'added_by_dest',
+  AddedBySource = 'added_by_source',
 }
 
 type ConflictInfo = {

@@ -361,9 +361,13 @@ function FileActions({
       );
       if (
         conflictData?.conflictType &&
-        [ConflictType.DeletedInSource, ConflictType.DeletedInDest].includes(
-          conflictData.conflictType,
-        )
+        [
+          ConflictType.DeletedByDest,
+          ConflictType.DeletedBySource,
+          ConflictType.AddedByDest,
+          ConflictType.AddedBySource,
+          ConflictType.BothDeleted,
+        ].includes(conflictData.conflictType)
       ) {
         actions.push(
           <Tooltip title={t('Delete file')} key="resolve-delete">
@@ -442,13 +446,18 @@ function FileActions({
 
 function labelForConflictType(type?: ConflictType) {
   switch (type) {
-    case ConflictType.DeletedInSource:
-      return t('(Deleted in $incoming)', {
-        replace: {$incoming: CONFLICT_SIDE_LABELS.incoming},
-      });
-
-    case ConflictType.DeletedInDest:
-      return t('(Deleted in $local)', {replace: {$local: CONFLICT_SIDE_LABELS.local}});
+    case ConflictType.BothAdded:
+      return t('(Both added)');
+    case ConflictType.BothDeleted:
+      return t('(Both deleted)');
+    case ConflictType.DeletedByDest:
+      return t('(Deleted by $local)', {replace: {$local: CONFLICT_SIDE_LABELS.local}});
+    case ConflictType.DeletedBySource:
+      return t('(Deleted by $incoming)', {replace: {$incoming: CONFLICT_SIDE_LABELS.incoming}});
+    case ConflictType.AddedByDest:
+      return t('(Added by $local)', {replace: {$local: CONFLICT_SIDE_LABELS.local}});
+    case ConflictType.AddedBySource:
+      return t('(Added by $incoming)', {replace: {$incoming: CONFLICT_SIDE_LABELS.incoming}});
     default:
       return null;
   }

@@ -1724,28 +1724,25 @@ export class GitDriver implements VCSDriver {
 /**
  * Map git's porcelain v2 unmerged XY status to ConflictType.
  *
- * XY values for unmerged entries:
- *   UU = both modified         → BothChanged
- *   AA = both added            → BothChanged
- *   DD = both deleted          → BothChanged
- *   DU = deleted by us (dest), modified by them (source) → DeletedInDest
- *   AU = added by us (dest), absent in theirs (source)   → DeletedInSource
- *   UD = modified by us (dest), deleted by them (source)  → DeletedInSource
- *   UA = absent in ours (dest), added by theirs (source)  → DeletedInDest
- *
- * Note: In rebase context, "ours" = destination (where we're rebasing onto),
- * "theirs" = source (the commits being rebased).
+ * In rebase context: "ours" (X) = destination (where we're rebasing onto),
+ * "theirs" (Y) = source (the commits being rebased).
  */
 function gitConflictXYToType(xy: string): ConflictType {
   switch (xy) {
+    case 'AA':
+      return ConflictType.BothAdded;
+    case 'DD':
+      return ConflictType.BothDeleted;
     case 'DU':
-    case 'UA':
-      return ConflictType.DeletedInDest;
+      return ConflictType.DeletedByDest;
     case 'UD':
+      return ConflictType.DeletedBySource;
     case 'AU':
-      return ConflictType.DeletedInSource;
+      return ConflictType.AddedByDest;
+    case 'UA':
+      return ConflictType.AddedBySource;
     default:
-      // UU, AA, DD, and anything unexpected
+      // UU and anything unexpected
       return ConflictType.BothChanged;
   }
 }

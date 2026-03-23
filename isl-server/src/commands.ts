@@ -341,15 +341,15 @@ function getConflictType(
   if (conflict == null) {
     return undefined;
   }
-  let type;
   if (conflict.local.exists && conflict.other.exists) {
-    type = ConflictType.BothChanged;
+    return ConflictType.BothChanged;
   } else if (conflict.other.exists) {
-    type = ConflictType.DeletedInDest;
+    // local (dest) doesn't have it, other (source) does
+    return ConflictType.DeletedByDest;
   } else {
-    type = ConflictType.DeletedInSource;
+    // local (dest) has it, other (source) doesn't
+    return ConflictType.DeletedBySource;
   }
-  return type;
 }
 
 /**
