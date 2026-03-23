@@ -483,9 +483,15 @@ export class GitDriver implements VCSDriver {
       const statusResult = await this.runCommand(ctx, ['status', '--porcelain=v2', '-uall']);
       for (const line of statusResult.stdout.split('\n')) {
         if (line.startsWith('u ')) {
+          // Porcelain v2 unmerged: u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
           const parts = line.split(' ');
+          const xy = parts[1]; // e.g. UU, AA, DU, UD, AU, UA, DD
           const filePath = parts.slice(10).join(' ');
-          conflictFiles.push({path: filePath, status: 'U', conflictType: ConflictType.BothChanged});
+          conflictFiles.push({
+            path: filePath,
+            status: 'U',
+            conflictType: gitConflictXYToType(xy),
+          });
         }
       }
     } catch {
@@ -1712,5 +1718,34 @@ export class GitDriver implements VCSDriver {
     const insertions = parseInt(insertionsMatch?.[1] ?? '0', 10);
     const deletions = parseInt(deletionsMatch?.[1] ?? '0', 10);
     return insertions + deletions;
+  }
+}
+
+/**
+ * Map git's porcelain v2 unmerged XY status to ConflictType.
+ *
+ * XY values for unmerged entries:
+ *   UU = both modified         → BothChanged
+ *   AA = both added            → BothChanged
+ *   DD = both deleted          → BothChanged
+ *   DU = deleted by us (dest), modified by them (source) → DeletedInDest
+ *   AU = added by us (dest), absent in theirs (source)   → DeletedInSource
+ *   UD = modified by us (dest), deleted by them (source)  → DeletedInSource
+ *   UA = absent in ours (dest), added by theirs (source)  → DeletedInDest
+ *
+ * Note: In rebase context, "ours" = destination (where we're rebasing onto),
+ * "theirs" = source (the commits being rebased).
+ */
+function gitConflictXYToType(xy: string): ConflictType {
+  switch (xy) {
+    case 'DU':
+    case 'UA':
+      return ConflictType.DeletedInDest;
+    case 'UD':
+    case 'AU':
+      return ConflictType.DeletedInSource;
+    default:
+      // UU, AA, DD, and anything unexpected
+      return ConflictType.BothChanged;
   }
 }
