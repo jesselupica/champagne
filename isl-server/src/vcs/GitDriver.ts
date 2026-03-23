@@ -275,6 +275,9 @@ export class GitDriver implements VCSDriver {
     // Build log args: always include HEAD, branches, and any stable/recommended locations
     const logArgs = [
       'log',
+      // Exclude stash refs — stash commits (WIP on ..., index on ...) should never
+      // appear in the commit graph. --exclude must come before --all.
+      '--exclude=refs/stash',
       '--all',
       '--format=' + format,
       '--topo-order',
