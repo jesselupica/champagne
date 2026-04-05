@@ -2,7 +2,7 @@
 set -e
 
 # Parse arguments
-VCS_TYPE="${1:-sapling}"
+VCS_TYPE="${1:-git}"
 if [[ "$VCS_TYPE" != "sapling" && "$VCS_TYPE" != "git" ]]; then
   echo "Usage: $0 [sapling|git]"
   echo "  Default: sapling"
@@ -153,6 +153,17 @@ echo ""
 echo "Repository location: $TEST_REPO"
 echo ""
 echo "========================================"
+echo "Installing dependencies & building..."
+echo "========================================"
+echo ""
+
+cd "$CHAMPAGNE_ROOT"
+yarn install --frozen-lockfile 2>&1 | tail -1
+echo "Building server..."
+cd "$CHAMPAGNE_ROOT/isl-server" && yarn build 2>&1 | tail -1
+echo ""
+
+echo "========================================"
 echo "Starting ISL server..."
 echo "========================================"
 echo ""
@@ -186,14 +197,21 @@ cleanup() {
 }
 trap cleanup INT TERM EXIT
 
+# Log files for debugging
+LOG_DIR="/tmp/champagne-logs"
+mkdir -p "$LOG_DIR"
+CLIENT_LOG="$LOG_DIR/client.log"
+SERVER_LOG="$LOG_DIR/server.log"
+echo "Logs: $LOG_DIR/{client,server}.log"
+
 # Start Vite client in the background
 cd "$CHAMPAGNE_ROOT/isl" || exit 1
-yarn start &
+yarn start 2>&1 | tee "$CLIENT_LOG" &
 CLIENT_PID=$!
 
 # Start the ISL server in the background (so trap can catch signals)
 cd "$CHAMPAGNE_ROOT/isl-server" || exit 1
-yarn serve --dev --foreground --stdout --force --vcs-type "$VCS_TYPE" --cwd "$TEST_REPO" &
+yarn serve --dev --foreground --stdout --force --vcs-type "$VCS_TYPE" --cwd "$TEST_REPO" 2>&1 | tee "$SERVER_LOG" &
 SERVER_PID=$!
 
 # Wait for either process to exit

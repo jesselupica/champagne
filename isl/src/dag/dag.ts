@@ -274,12 +274,22 @@ export class Dag extends SelfUpdate<CommitDagRecord> {
         return [...sorted];
       }
       const hashes = arrayFromHashes(set === undefined ? this.all() : set);
-      return hashes.sort((a, b) => {
-        const aIdx = index.get(a);
-        const bIdx = index.get(b);
-        if (aIdx == null || bIdx == null) {
-          throw new Error(`Commit ${a} or ${b} is not in the dag.`);
-        }
+      // Filter out hashes missing from the index to avoid crashing the UI.
+      // This can happen during rebase previews when the dag and index are transiently inconsistent.
+      const missing = hashes.filter(h => !index.has(h));
+      if (missing.length > 0) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `sortAsc: ${missing.length} commit(s) not in dag index:`,
+          missing,
+          `\nIndex size: ${index.size}, dag.all() size: ${[...this.all()].length}`,
+          `\nMissing in dag.has(): ${missing.filter(h => !this.has(h))}`,
+        );
+      }
+      const validHashes = missing.length > 0 ? hashes.filter(h => index.has(h)) : hashes;
+      return validHashes.sort((a, b) => {
+        const aIdx = index.get(a)!;
+        const bIdx = index.get(b)!;
         return aIdx - bIdx;
       });
     }
