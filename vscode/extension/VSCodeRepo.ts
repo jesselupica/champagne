@@ -13,13 +13,13 @@ import {GeneratedStatus, type ChangedFile} from 'isl/src/types';
 import type {Comparison} from 'shared/Comparison';
 import type {Writable} from 'shared/typeUtils';
 import type {
-  SaplingChangedFile,
-  SaplingCommandOutput,
-  SaplingCommitInfo,
-  SaplingComparison,
-  SaplingConflictContext,
-  SaplingCurrentCommitDiff,
-  SaplingRepository,
+  ChampagneChangedFile,
+  ChampagneCommandOutput,
+  ChampagneCommitInfo,
+  ChampagneComparison,
+  ChampagneConflictContext,
+  ChampagneCurrentCommitDiff,
+  ChampagneRepository,
 } from './api/types';
 import type {EnabledSCMApiFeature} from './types';
 
@@ -36,8 +36,8 @@ import {beforeRevsetForComparison, ComparisonType} from 'shared/Comparison';
 import {filterFilesFromPatch, parsePatch} from 'shared/patch/parse';
 import {notEmpty} from 'shared/utils';
 import * as vscode from 'vscode';
-import {encodeSaplingDiffUri} from './DiffContentProvider';
-import SaplingFileDecorationProvider from './SaplingFileDecorationProvider';
+import {encodeChampagneDiffUri} from './DiffContentProvider';
+import ChampagneFileDecorationProvider from './ChampagneFileDecorationProvider';
 import {executeVSCodeCommand} from './commands';
 import {getCLICommand} from './config';
 import {t} from './i18n';
@@ -109,13 +109,13 @@ export class VSCodeReposList {
       this.knownRepos.delete(fsPath);
     }
 
-    executeVSCodeCommand('setContext', 'sapling:hasRepo', this.knownRepos.size > 0);
+    executeVSCodeCommand('setContext', 'champagne:hasRepo', this.knownRepos.size > 0);
 
     Promise.all(Array.from(this.knownRepos.values()).map(repo => repo.promise)).then(repos => {
       const hasRemoteLinkRepo = repos.some(
         repo => repo instanceof Repository && repo.codeReviewProvider?.getRemoteFileURL,
       );
-      executeVSCodeCommand('setContext', 'sapling:hasRemoteLinkRepo', hasRemoteLinkRepo);
+      executeVSCodeCommand('setContext', 'champagne:hasRemoteLinkRepo', hasRemoteLinkRepo);
     });
   }
 
@@ -170,22 +170,22 @@ export class VSCodeReposList {
   }
 }
 
-type SaplingResourceState = vscode.SourceControlResourceState & {
+type ChampagneResourceState = vscode.SourceControlResourceState & {
   status?: string;
 };
-export type SaplingResourceGroup = vscode.SourceControlResourceGroup & {
-  resourceStates: SaplingResourceState[];
+export type ChampagneResourceGroup = vscode.SourceControlResourceGroup & {
+  resourceStates: ChampagneResourceState[];
 };
 /**
  * vscode-API-compatible repository.
  * This handles vscode-api integrations, but defers to Repository for any actual work.
  */
-export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
+export class VSCodeRepo implements vscode.QuickDiffProvider, ChampagneRepository {
   private disposables: Array<vscode.Disposable> = [];
   private sourceControl?: vscode.SourceControl;
   private resourceGroups?: Record<
     'changes' | 'untracked' | 'unresolved' | 'resolved',
-    SaplingResourceGroup
+    ChampagneResourceGroup
   >;
   public rootUri: vscode.Uri;
   public rootPath: string;
@@ -207,7 +207,7 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
     }
 
     this.sourceControl = vscode.scm.createSourceControl(
-      'sapling',
+      'champagne',
       t('Champagne'),
       vscode.Uri.file(repo.info.repoRoot),
     );
@@ -227,7 +227,7 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
       group.hideWhenEmpty = true;
     }
 
-    const fileDecorationProvider = new SaplingFileDecorationProvider(this, logger);
+    const fileDecorationProvider = new ChampagneFileDecorationProvider(this, logger);
     this.disposables.push(
       repo.subscribeToUncommittedChanges(() => {
         this.updateResourceGroups();
@@ -266,7 +266,7 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
         return;
       }
       const autoResolveEnabled = vscode.workspace
-        .getConfiguration('sapling')
+        .getConfiguration('champagne')
         .get<boolean>('markConflictingFilesResolvedOnSave');
       if (!autoResolveEnabled) {
         return;
@@ -302,14 +302,14 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
     // only show merge conflicts if they are given
     const fileChanges = conflicts ?? data?.files?.value ?? [];
 
-    const changes: Array<SaplingResourceState> = [];
-    const untracked: Array<SaplingResourceState> = [];
-    const unresolved: Array<SaplingResourceState> = [];
-    const resolved: Array<SaplingResourceState> = [];
+    const changes: Array<ChampagneResourceState> = [];
+    const untracked: Array<ChampagneResourceState> = [];
+    const unresolved: Array<ChampagneResourceState> = [];
+    const resolved: Array<ChampagneResourceState> = [];
 
     for (const change of fileChanges) {
       const uri = vscode.Uri.joinPath(this.rootUri, change.path);
-      const resource: SaplingResourceState = {
+      const resource: ChampagneResourceState = {
         command: {
           command: 'vscode.open',
           title: 'Open',
@@ -386,7 +386,7 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
   }
 
   /**
-   * Use ContentProvider + encodeSaplingDiffUri
+   * Use ContentProvider + encodeChampagneDiffUri
    */
   provideOriginalResource(uri: vscode.Uri): vscode.Uri | undefined {
     if (uri.scheme !== 'file') {
@@ -396,7 +396,7 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
     // diff gutters to be either uncommitted changes / head changes / stack changes
     const comparison = {type: ComparisonType.UncommittedChanges} as Comparison;
 
-    return encodeSaplingDiffUri(uri, beforeRevsetForComparison(comparison));
+    return encodeChampagneDiffUri(uri, beforeRevsetForComparison(comparison));
   }
 
   ////////////////////////////////////////////////////////////////////////////////////
@@ -405,33 +405,33 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
     return this.repo.info;
   }
 
-  getDotCommit(): SaplingCommitInfo | undefined {
+  getDotCommit(): ChampagneCommitInfo | undefined {
     return this.repo.getHeadCommit();
   }
-  onChangeDotCommit(callback: (commit: SaplingCommitInfo | undefined) => void): vscode.Disposable {
+  onChangeDotCommit(callback: (commit: ChampagneCommitInfo | undefined) => void): vscode.Disposable {
     return this.repo.subscribeToHeadCommit(callback);
   }
-  getUncommittedChanges(): ReadonlyArray<SaplingChangedFile> {
+  getUncommittedChanges(): ReadonlyArray<ChampagneChangedFile> {
     return this.repo.getUncommittedChanges()?.files?.value ?? [];
   }
   onChangeUncommittedChanges(
-    callback: (changes: ReadonlyArray<SaplingChangedFile>) => void,
+    callback: (changes: ReadonlyArray<ChampagneChangedFile>) => void,
   ): vscode.Disposable {
     return this.repo.subscribeToUncommittedChanges(result => {
       callback(result.files?.value ?? []);
     });
   }
 
-  runSlCommand(
+  runVcsCommand(
     args: Array<string>,
     eventName: TrackEventName | undefined = undefined,
-  ): Promise<SaplingCommandOutput> {
+  ): Promise<ChampagneCommandOutput> {
     return this.repo.runCommand(args, eventName, this.repo.initialConnectionContext);
   }
 
-  async getCurrentStack(): Promise<ReadonlyArray<SaplingCommitInfo>> {
+  async getCurrentStack(): Promise<ReadonlyArray<ChampagneCommitInfo>> {
     const revset = 'sort(draft() and ancestors(.), topo)';
-    const result = await this.runSlCommand(
+    const result = await this.runVcsCommand(
       ['log', '--rev', revset, '--template', getMainFetchTemplate(this.info.codeReviewSystem)],
       'GetCurrentStack',
     );
@@ -442,9 +442,9 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
     }
   }
 
-  async getFullFocusedBranch(): Promise<ReadonlyArray<SaplingCommitInfo>> {
+  async getFullFocusedBranch(): Promise<ReadonlyArray<ChampagneCommitInfo>> {
     const revset = 'sort(focusedbranch(.), topo)';
-    const result = await this.runSlCommand(
+    const result = await this.runVcsCommand(
       ['log', '--rev', revset, '--template', getMainFetchTemplate(this.info.codeReviewSystem)],
       'GetFullFocusedBranch',
     );
@@ -457,7 +457,7 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
 
   /** @deprecated - prefer `diff({type: 'Commit', hash: commit || '.'})` */
   async getDiff(commit?: string): Promise<string> {
-    const result = await this.runSlCommand(['diff', '-c', commit || '.']);
+    const result = await this.runVcsCommand(['diff', '-c', commit || '.']);
 
     if (result.exitCode === 0) {
       return result.stdout;
@@ -467,7 +467,7 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
   }
 
   async diff(
-    comparison: Comparison | SaplingComparison,
+    comparison: Comparison | ChampagneComparison,
     options?: {excludeGenerated?: boolean},
   ): Promise<string> {
     const output = await this.repo.runDiff(
@@ -504,23 +504,23 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
 
   async commit(title: string, commitMessage: string): Promise<void> {
     const message = `${title}\n\n${commitMessage}`;
-    const result = await this.runSlCommand(['commit', '-m', message]);
+    const result = await this.runVcsCommand(['commit', '-m', message]);
 
     if (result.exitCode !== 0) {
       throw new Error(result.stderr);
     }
   }
 
-  async getMergeConflictContext(): Promise<SaplingConflictContext[]> {
-    const result = await this.runSlCommand(['debugconflictcontext']);
+  async getMergeConflictContext(): Promise<ChampagneConflictContext[]> {
+    const result = await this.runVcsCommand(['debugconflictcontext']);
     if (result.exitCode !== 0) {
       throw new Error(result.stderr);
     }
 
-    return JSON.parse(result.stdout) as SaplingConflictContext[];
+    return JSON.parse(result.stdout) as ChampagneConflictContext[];
   }
 
-  async getCurrentCommitDiff(): Promise<SaplingCurrentCommitDiff> {
+  async getCurrentCommitDiff(): Promise<ChampagneCurrentCommitDiff> {
     const diff = (await diffCurrentCommit(
       this.repo,
       this.repo.initialConnectionContext,

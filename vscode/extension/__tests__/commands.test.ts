@@ -14,7 +14,7 @@ import * as vscode from 'vscode';
 import {vscodeCommands} from '../commands';
 import {shouldOpenBeside} from '../config';
 import {encodeDeletedFileUri} from '../DeletedFileContentProvider';
-import {encodeSaplingDiffUri} from '../DiffContentProvider';
+import {encodeChampagneDiffUri} from '../DiffContentProvider';
 
 // Mock vscode command
 jest.mock('vscode', () => {
@@ -45,7 +45,7 @@ jest.mock('../config', () => ({
 const mockShouldOpenBeside = shouldOpenBeside as jest.MockedFunction<typeof shouldOpenBeside>;
 
 describe('open-file-diff', () => {
-  const openDiffView = vscodeCommands['sapling.open-file-diff'];
+  const openDiffView = vscodeCommands['champagne.open-file-diff'];
 
   const repoRoot = '/repo/root';
   const filePath = 'path/to/file';
@@ -76,7 +76,7 @@ describe('open-file-diff', () => {
     await openDiffView(fileUri, comparison);
 
     const expectedLeftRev = '.';
-    const expectedLeftUri = encodeSaplingDiffUri(fileUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(fileUri, expectedLeftRev);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
       'vscode.diff',
@@ -94,9 +94,9 @@ describe('open-file-diff', () => {
     await openDiffView(submoduleUri, comparison);
 
     const expectedLeftRev = '.';
-    const expectedLeftUri = encodeSaplingDiffUri(submoduleUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(submoduleUri, expectedLeftRev);
     const expectedRightRev = 'wdir()';
-    const expectedRightUri = encodeSaplingDiffUri(submoduleUri, expectedRightRev);
+    const expectedRightUri = encodeChampagneDiffUri(submoduleUri, expectedRightRev);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
       'vscode.diff',
@@ -114,7 +114,7 @@ describe('open-file-diff', () => {
     await openDiffView(fileUri, comparison);
 
     const expectedLeftRev = '.';
-    const expectedLeftUri = encodeSaplingDiffUri(fileUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(fileUri, expectedLeftRev);
     const expectedRightUri = encodeDeletedFileUri(fileUri);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
@@ -133,7 +133,7 @@ describe('open-file-diff', () => {
     await openDiffView(fileUri, comparison);
 
     const expectedLeftRev = '.^';
-    const expectedLeftUri = encodeSaplingDiffUri(fileUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(fileUri, expectedLeftRev);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
       'vscode.diff',
@@ -151,9 +151,9 @@ describe('open-file-diff', () => {
     await openDiffView(submoduleUri, comparison);
 
     const expectedLeftRev = '.^';
-    const expectedLeftUri = encodeSaplingDiffUri(submoduleUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(submoduleUri, expectedLeftRev);
     const expectedRightRev = 'wdir()';
-    const expectedRightUri = encodeSaplingDiffUri(submoduleUri, expectedRightRev);
+    const expectedRightUri = encodeChampagneDiffUri(submoduleUri, expectedRightRev);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
       'vscode.diff',
@@ -171,7 +171,7 @@ describe('open-file-diff', () => {
     await openDiffView(fileUri, comparison);
 
     const expectedLeftRev = 'ancestor(.,interestingmaster())';
-    const expectedLeftUri = encodeSaplingDiffUri(fileUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(fileUri, expectedLeftRev);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
       'vscode.diff',
@@ -189,9 +189,9 @@ describe('open-file-diff', () => {
     await openDiffView(submoduleUri, comparison);
 
     const expectedLeftRev = 'ancestor(.,interestingmaster())';
-    const expectedLeftUri = encodeSaplingDiffUri(submoduleUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(submoduleUri, expectedLeftRev);
     const expectedRightRev = 'wdir()';
-    const expectedRightUri = encodeSaplingDiffUri(submoduleUri, expectedRightRev);
+    const expectedRightUri = encodeChampagneDiffUri(submoduleUri, expectedRightRev);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
       'vscode.diff',
@@ -207,9 +207,9 @@ describe('open-file-diff', () => {
     await openDiffView(fileUri, comparison);
 
     const expectedLeftRev = 'abc123^';
-    const expectedLeftUri = encodeSaplingDiffUri(fileUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(fileUri, expectedLeftRev);
     const expectedRightRev = 'abc123';
-    const expectedRightUri = encodeSaplingDiffUri(fileUri, expectedRightRev);
+    const expectedRightUri = encodeChampagneDiffUri(fileUri, expectedRightRev);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
       'vscode.diff',
@@ -225,9 +225,9 @@ describe('open-file-diff', () => {
     await openDiffView(submoduleUri, comparison);
 
     const expectedLeftRev = 'abc123^';
-    const expectedLeftUri = encodeSaplingDiffUri(submoduleUri, expectedLeftRev);
+    const expectedLeftUri = encodeChampagneDiffUri(submoduleUri, expectedLeftRev);
     const expectedRightRev = 'abc123';
-    const expectedRightUri = encodeSaplingDiffUri(submoduleUri, expectedRightRev);
+    const expectedRightUri = encodeChampagneDiffUri(submoduleUri, expectedRightRev);
 
     expect(mockExecuteVSCodeCommand).toHaveBeenCalledWith(
       'vscode.diff',

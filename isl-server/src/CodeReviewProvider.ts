@@ -31,7 +31,7 @@ export interface CodeReviewProvider {
 
   onChangeDiffSummaries(callback: (result: Result<DiffSummaries>) => unknown): Disposable;
 
-  /** Run a command not handled within sapling, such as a separate submit handler */
+  /** Run a command not handled within the VCS driver, such as a separate submit handler */
   runExternalCommand?(
     cwd: string,
     args: CommandArg[], // Providers may need specific normalization for args

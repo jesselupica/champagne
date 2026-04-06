@@ -27,12 +27,12 @@ const langs: {[key: string]: {[key: string]: string}} = {
 declare global {
   interface Window {
     // language may be pre-defined ahead of time by the HTML in the window
-    saplingLanguage?: string;
+    champagneLanguage?: string;
   }
 }
 
 let currentLanguage: LanguageId =
-  (typeof window !== 'undefined' ? window.saplingLanguage : null) ?? 'en';
+  (typeof window !== 'undefined' ? window.champagneLanguage : null) ?? 'en';
 
 const I18nContext = createContext(currentLanguage);
 export const onChangeLanguage = new TypedEventEmitter<'change', string>();

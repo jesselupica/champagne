@@ -64,7 +64,7 @@ export default function VSCodeSettings() {
   );
 }
 
-const openBesidesSetting = vscodeConfigBackedAtom<boolean>('sapling.isl.openBeside', false);
+const openBesidesSetting = vscodeConfigBackedAtom<boolean>('champagne.isl.openBeside', false);
 
 function vscodeConfigBackedAtom<T extends Json>(
   configName: string,

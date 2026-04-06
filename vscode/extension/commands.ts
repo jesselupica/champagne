@@ -26,34 +26,34 @@ import {
 } from 'shared/Comparison';
 import * as vscode from 'vscode';
 import {encodeDeletedFileUri} from './DeletedFileContentProvider';
-import {encodeSaplingDiffUri} from './DiffContentProvider';
+import {encodeChampagneDiffUri} from './DiffContentProvider';
 import {shouldOpenBeside} from './config';
 import {t} from './i18n';
 
 /**
- * VS Code Commands registered by the Sapling extension.
+ * VS Code Commands registered by the Champagne extension.
  */
 export const vscodeCommands = {
-  ['sapling.open-file-diff-uncommitted']: commandWithUriOrResourceState((_, uri: vscode.Uri) =>
+  ['champagne.open-file-diff-uncommitted']: commandWithUriOrResourceState((_, uri: vscode.Uri) =>
     openDiffView(uri, {type: ComparisonType.UncommittedChanges}),
   ),
-  ['sapling.open-file-diff-head']: commandWithUriOrResourceState((_, uri: vscode.Uri) =>
+  ['champagne.open-file-diff-head']: commandWithUriOrResourceState((_, uri: vscode.Uri) =>
     openDiffView(uri, {type: ComparisonType.HeadChanges}),
   ),
-  ['sapling.open-file-diff-stack']: commandWithUriOrResourceState((_, uri: vscode.Uri) =>
+  ['champagne.open-file-diff-stack']: commandWithUriOrResourceState((_, uri: vscode.Uri) =>
     openDiffView(uri, {type: ComparisonType.StackChanges}),
   ),
-  ['sapling.open-file-diff']: (uri: vscode.Uri, comparison: Comparison) =>
+  ['champagne.open-file-diff']: (uri: vscode.Uri, comparison: Comparison) =>
     openDiffView(uri, comparison),
 
-  ['sapling.open-remote-file-link']: commandWithUriOrResourceState(
+  ['champagne.open-remote-file-link']: commandWithUriOrResourceState(
     (repo: Repository, uri, path: RepoRelativePath) => openRemoteFileLink(repo, uri, path),
   ),
-  ['sapling.copy-remote-file-link']: commandWithUriOrResourceState(
+  ['champagne.copy-remote-file-link']: commandWithUriOrResourceState(
     (repo: Repository, uri, path: RepoRelativePath) => openRemoteFileLink(repo, uri, path, true),
   ),
 
-  ['sapling.revert-file']: commandWithUriOrResourceState(async function (
+  ['champagne.revert-file']: commandWithUriOrResourceState(async function (
     this: RepositoryContext,
     repo: Repository,
     _,
@@ -90,25 +90,25 @@ type ExternalVSCodeCommands = {
     metadata: surveyMetaData,
   ) => Thenable<void>;
   'workbench.action.pinEditor': () => Thenable<void>;
-  'sapling.open-isl': () => Thenable<void>;
-  'sapling.close-isl': () => Thenable<void>;
-  'sapling.isl.focus': () => Thenable<void>;
-  'sapling.open-isl-with-commit-message': (
+  'champagne.open-isl': () => Thenable<void>;
+  'champagne.close-isl': () => Thenable<void>;
+  'champagne.isl.focus': () => Thenable<void>;
+  'champagne.open-isl-with-commit-message': (
     title: string,
     description: string,
     mode?: 'commit' | 'amend',
     hash?: string,
   ) => Thenable<void>;
-  'sapling.open-split-view-with-commits': (
+  'champagne.open-split-view-with-commits': (
     commits: Array<PartiallySelectedDiffCommit>,
     commitHash?: string,
   ) => Thenable<void>;
-  'sapling.open-comparison-view': (comparison: Comparison) => Thenable<void>;
+  'champagne.open-comparison-view': (comparison: Comparison) => Thenable<void>;
   setContext: (key: string, value: unknown) => Thenable<void>;
   'fb-hg.open-or-focus-interactive-smartlog': (
     _: unknown,
     __?: unknown,
-    forceNoSapling?: boolean,
+    forceNoChampagne?: boolean,
   ) => Thenable<void>;
 };
 
@@ -116,7 +116,7 @@ export type VSCodeCommand = typeof vscodeCommands & ExternalVSCodeCommands;
 
 /**
  * Type-safe programmatic execution of VS Code commands (via `vscode.commands.executeCommand`).
- * Sapling-provided commands are defined in vscodeCommands.
+ * Champagne-provided commands are defined in vscodeCommands.
  * Built-in or third-party commands may also be typed through this function,
  * just define them in ExternalVSCodeCommands.
  */
@@ -180,7 +180,7 @@ async function openDiffView(uri: vscode.Uri, comparison: Comparison): Promise<un
 
 function getLeftUri(uri: vscode.Uri, comparison: Comparison): vscode.Uri {
   const leftRev = beforeRevsetForComparison(comparison);
-  return encodeSaplingDiffUri(uri, leftRev);
+  return encodeChampagneDiffUri(uri, leftRev);
 }
 
 /**
@@ -196,7 +196,7 @@ function getLeftUri(uri: vscode.Uri, comparison: Comparison): vscode.Uri {
 async function getRightUri(uri: vscode.Uri, comparison: Comparison): Promise<vscode.Uri> {
   const rightRev = currRevsetForComparison(comparison);
   if (comparison.type === ComparisonType.Committed || isSubmodule(uri.fsPath)) {
-    return encodeSaplingDiffUri(uri, rightRev);
+    return encodeChampagneDiffUri(uri, rightRev);
   }
   return (await fileExists(uri)) ? uri : encodeDeletedFileUri(uri);
 }

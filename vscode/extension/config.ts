@@ -18,12 +18,12 @@ export const PERSISTED_STORAGE_KEY_PREFIX = 'isl-persisted:';
 export function getCLICommand(): string {
   // prettier-disable
   return (
-    vscode.workspace.getConfiguration('sapling').get('commandPath') ||
+    vscode.workspace.getConfiguration('champagne').get('commandPath') ||
     (os.platform() === 'win32' ? 'sl.exe' : 'sl')
   );
 }
 
 /** Whether the user has configured for files, diffs, and comparisons to open in ViewColumn.Beside instead of ViewColumn.Active. */
 export function shouldOpenBeside(): boolean {
-  return vscode.workspace.getConfiguration('sapling').get<boolean>('isl.openBeside') === true;
+  return vscode.workspace.getConfiguration('champagne').get<boolean>('isl.openBeside') === true;
 }

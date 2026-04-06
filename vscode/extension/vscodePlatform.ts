@@ -103,7 +103,7 @@ export const getVSCodePlatform = (context: vscode.ExtensionContext): VSCodeServe
           }
           const path: AbsolutePath = pathModule.join(repo.info.repoRoot, message.path);
           const uri = vscode.Uri.file(path);
-          executeVSCodeCommand('sapling.open-file-diff', uri, message.comparison);
+          executeVSCodeCommand('champagne.open-file-diff', uri, message.comparison);
           break;
         }
         case 'platform/openExternal': {

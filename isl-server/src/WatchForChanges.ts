@@ -186,7 +186,7 @@ export class WatchForChanges {
       await fs.writeFile(path.join(realDotdir, '.watchmanconfig'), '{}');
     }
 
-    const DIRSTATE_WATCHMAN_SUBSCRIPTION = 'sapling-smartlog-dirstate-change';
+    const DIRSTATE_WATCHMAN_SUBSCRIPTION = 'champagne-smartlog-dirstate-change';
     try {
       const handleRepositoryStateChange = debounce(() => {
         // if the repo changes, also recheck files. E.g. if you commit, your uncommitted changes will also change.

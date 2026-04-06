@@ -990,7 +990,7 @@ function SubmitButton({
             <div>
               <T>To continue, select a command to use to submit.</T>
             </div>
-            <Link href="https://sapling-scm.com/docs/git/intro#pull-requests">
+            <Link href="https://jesselupica.github.io/champagne/docs/git-pull-requests">
               <T>Learn More</T>
             </Link>
           </div>

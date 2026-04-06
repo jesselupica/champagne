@@ -20,10 +20,10 @@ import * as vscode from 'vscode';
  * for the left side of a diff as a new URI with a custom scheme,
  * then you add a content provider for that custom URI to give the "original" file contents.
  *
- * SaplingDiffContentProvider uses a repository to provide the "original"
- * file content for a comparison using `sl cat`.
+ * ChampagneDiffContentProvider uses a repository to provide the "original"
+ * file content for a comparison using `vcs cat`.
  */
-export class SaplingDiffContentProvider implements vscode.TextDocumentContentProvider {
+export class ChampagneDiffContentProvider implements vscode.TextDocumentContentProvider {
   private disposables: Array<vscode.Disposable> = [];
 
   /**
@@ -33,15 +33,15 @@ export class SaplingDiffContentProvider implements vscode.TextDocumentContentPro
    */
   private activeUrisByRepo: Map<
     Repository | 'unknown',
-    Set<string /* serialized SaplingDiffEncodedUri */>
+    Set<string /* serialized ChampagneDiffEncodedUri */>
   > = new Map();
 
   /**
    * VS Code requests content for uris each time the diff view is focused.
    * Diff original content won't change until the current commit is changed,
-   * so we can cache file contents to avoid repeat `sl cat` calls.
+   * so we can cache file contents to avoid repeat `vcs cat` calls.
    * We don't want to store unlimited file contents in memory, so we use an LRU cache.
-   * Missing the cache just means re-running `sl cat` again.
+   * Missing the cache just means re-running `vcs cat` again.
    */
   private fileContentsByEncodedUri = new LRU<string, string>(20);
 
@@ -56,7 +56,7 @@ export class SaplingDiffContentProvider implements vscode.TextDocumentContentPro
         const fixed = [];
         for (const encoded of unownedComparisons.values()) {
           const encodedUri = vscode.Uri.parse(encoded);
-          const {fsPath} = decodeSaplingDiffUri(encodedUri).originalUri;
+          const {fsPath} = decodeChampagneDiffUri(encodedUri).originalUri;
           for (const root of knownRoots) {
             if (fsPath === root || fsPath.startsWith(ensureTrailingPathSep(root))) {
               fixed.push(encodedUri);
@@ -79,7 +79,7 @@ export class SaplingDiffContentProvider implements vscode.TextDocumentContentPro
         // TODO: this is slightly wastefully un- and re-subscribing to all repos whenever any of them change.
         // However, repos changing is relatively rare.
         repo.subscribeToHeadCommit(() => {
-          // Clear out file cache, so all future fetches re-check with sl cat.
+          // Clear out file cache, so all future fetches re-check with vcs cat.
           // TODO: This is slightly over-aggressive, since it invalidates other repos too.
           // We could instead iterate the cache to delete paths belonging to this repo
           this.fileContentsByEncodedUri.clear();
@@ -101,7 +101,7 @@ export class SaplingDiffContentProvider implements vscode.TextDocumentContentPro
     this.disposables.push(
       // track closing diff providers to know when you remove from tracked uris
       vscode.workspace.onDidCloseTextDocument(e => {
-        if (e.uri.scheme === SAPLING_DIFF_PROVIDER_SCHEME) {
+        if (e.uri.scheme === CHAMPAGNE_DIFF_PROVIDER_SCHEME) {
           for (const uris of this.activeUrisByRepo.values()) {
             const encodedUri = e.uri.toString();
             if (uris.has(encodedUri)) {
@@ -109,7 +109,7 @@ export class SaplingDiffContentProvider implements vscode.TextDocumentContentPro
               // No need to clear the file content cache for this uri at this point:
               // It is very likely the user can re-open the same diff view without changing
               // their head commit. We can use cached file content between these opens
-              // to avoid running `sl cat`.
+              // to avoid running `vcs cat`.
             }
           }
         }
@@ -130,7 +130,7 @@ export class SaplingDiffContentProvider implements vscode.TextDocumentContentPro
     _token: vscode.CancellationToken,
   ): Promise<string | null> {
     const encodedUriString = encodedUri.toString();
-    const data = decodeSaplingDiffUri(encodedUri);
+    const data = decodeChampagneDiffUri(encodedUri);
     const {fsPath} = data.originalUri;
 
     const repo = repositoryCache.cachedRepositoryForPath(fsPath);
@@ -173,50 +173,50 @@ export class SaplingDiffContentProvider implements vscode.TextDocumentContentPro
   }
 }
 
-export function registerSaplingDiffContentProvider(ctx: RepositoryContext): vscode.Disposable {
+export function registerChampagneDiffContentProvider(ctx: RepositoryContext): vscode.Disposable {
   return vscode.workspace.registerTextDocumentContentProvider(
-    SAPLING_DIFF_PROVIDER_SCHEME,
-    new SaplingDiffContentProvider(ctx),
+    CHAMPAGNE_DIFF_PROVIDER_SCHEME,
+    new ChampagneDiffContentProvider(ctx),
   );
 }
 
-export const SAPLING_DIFF_PROVIDER_SCHEME = 'sapling-diff';
+export const CHAMPAGNE_DIFF_PROVIDER_SCHEME = 'champagne-diff';
 /**
- * {@link vscode.Uri} with scheme of {@link SAPLING_DIFF_PROVIDER_SCHEME}
+ * {@link vscode.Uri} with scheme of {@link CHAMPAGNE_DIFF_PROVIDER_SCHEME}
  */
-type SaplingDiffEncodedUri = vscode.Uri;
+type ChampagneDiffEncodedUri = vscode.Uri;
 
-type SaplingURIEncodedData = {
+type ChampagneURIEncodedData = {
   revset: string;
 };
 
 /**
  * Encode a normal file's URI plus a comparison revset
- * to get the custom URI which {@link SaplingDiffContentProvider} knows how to provide content for
+ * to get the custom URI which {@link ChampagneDiffContentProvider} knows how to provide content for
  * that file at that revset.
- * Decoded by {@link decodeSaplingDiffUri}.
+ * Decoded by {@link decodeChampagneDiffUri}.
  */
-export function encodeSaplingDiffUri(uri: vscode.Uri, revset: string): SaplingDiffEncodedUri {
+export function encodeChampagneDiffUri(uri: vscode.Uri, revset: string): ChampagneDiffEncodedUri {
   if (uri.scheme !== 'file') {
-    throw new Error('encoding non-file:// uris as sapling diff uris is not supported');
+    throw new Error('encoding non-file:// uris as champagne diff uris is not supported');
   }
   return uri.with({
-    scheme: SAPLING_DIFF_PROVIDER_SCHEME,
+    scheme: CHAMPAGNE_DIFF_PROVIDER_SCHEME,
     query: JSON.stringify({
       revset,
-    } as SaplingURIEncodedData),
+    } as ChampagneURIEncodedData),
   });
 }
 
 /**
- * Decode a custom URI which was encoded by  {@link encodeSaplingDiffUri},
+ * Decode a custom URI which was encoded by  {@link encodeChampagneDiffUri},
  * to get the original file URI back.
  */
-export function decodeSaplingDiffUri(uri: SaplingDiffEncodedUri): {
+export function decodeChampagneDiffUri(uri: ChampagneDiffEncodedUri): {
   originalUri: vscode.Uri;
   revset: string;
 } {
-  const data = JSON.parse(uri.query) as SaplingURIEncodedData;
+  const data = JSON.parse(uri.query) as ChampagneURIEncodedData;
   return {
     originalUri: uri.with({scheme: 'file', query: ''}),
     revset: data.revset,

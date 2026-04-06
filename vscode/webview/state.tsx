@@ -10,7 +10,7 @@ import {registerDisposable} from 'isl/src/utils';
 import {atom} from 'jotai';
 import serverAPI from '../../isl/src/ClientToServerAPI';
 
-/** Should match the sapling.comparisonPanelMode enum in package.json */
+/** Should match the champagne.comparisonPanelMode enum in package.json */
 export enum ComparisonPanelMode {
   Auto = 'Auto',
   AlwaysOpenPanel = 'Always Separate Panel',
@@ -19,12 +19,12 @@ export enum ComparisonPanelMode {
 export const comparisonPanelMode = atom<undefined | ComparisonPanelMode>(ComparisonPanelMode.Auto);
 serverAPI.postMessage({
   type: 'platform/subscribeToVSCodeConfig',
-  config: 'sapling.comparisonPanelMode',
+  config: 'champagne.comparisonPanelMode',
 });
 registerDisposable(
   comparisonPanelMode,
   serverAPI.onMessageOfType('platform/vscodeConfigChanged', config => {
-    if (config.config === 'sapling.comparisonPanelMode' && typeof config.value === 'string') {
+    if (config.config === 'champagne.comparisonPanelMode' && typeof config.value === 'string') {
       writeAtom(comparisonPanelMode, config.value as ComparisonPanelMode);
     }
   }),
@@ -37,7 +37,7 @@ export const setComparisonPanelMode = (mode: ComparisonPanelMode) => {
   writeAtom(comparisonPanelMode, mode);
   serverAPI.postMessage({
     type: 'platform/setVSCodeConfig',
-    config: 'sapling.comparisonPanelMode',
+    config: 'champagne.comparisonPanelMode',
     value: mode,
     scope: 'global',
   });

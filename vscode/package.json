@@ -2,7 +2,7 @@
   "name": "champagne-scm",
   "displayName": "Champagne SCM",
   "description": "A universal, graphical source control interface for Git, Sapling, Graphite, and more",
-  "version": "0.1.1",
+  "version": "0.1.3",
   "publisher": "jesselupica",
   "license": "MIT",
   "engines": {
@@ -13,9 +13,9 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onCommand:sapling.open-isl",
-    "onWebviewPanel:sapling.isl",
-    "onView:sapling.isl"
+    "onCommand:champagne.open-isl",
+    "onWebviewPanel:champagne.isl",
+    "onView:champagne.isl"
   ],
   "extensionKind": [
     "workspace"
@@ -26,7 +26,7 @@
   },
   "main": "./dist/extension.js",
   "icon": "resources/extensionIcon.png",
-  "homepage": "https://github.com/jesselupica/champagne",
+  "homepage": "https://jesselupica.github.io/champagne/",
   "bugs": {
     "url": "https://github.com/jesselupica/champagne/issues"
   },
@@ -38,22 +38,22 @@
     "configuration": {
       "title": "Champagne",
       "properties": {
-        "sapling.commandPath": {
+        "champagne.commandPath": {
           "type": "string",
           "default": "",
           "description": "%settings.commandPath.description%"
         },
-        "sapling.showInlineBlame": {
+        "champagne.showInlineBlame": {
           "type": "boolean",
           "description": "%settings.showInlineBlame.description%",
           "default": true
         },
-        "sapling.showDiffComments": {
+        "champagne.showDiffComments": {
           "type": "boolean",
           "description": "%settings.showDiffComments.description%",
           "default": true
         },
-        "sapling.inlineCommentDiffViewMode": {
+        "champagne.inlineCommentDiffViewMode": {
           "type": "string",
           "enum": [
             "Unified",
@@ -62,12 +62,12 @@
           "description": "%settings.diffViewMode.description%",
           "default": "Unified"
         },
-        "sapling.markConflictingFilesResolvedOnSave": {
+        "champagne.markConflictingFilesResolvedOnSave": {
           "type": "boolean",
           "description": "%settings.markConflictingFilesResolvedOnSave.description%",
           "default": true
         },
-        "sapling.comparisonPanelMode": {
+        "champagne.comparisonPanelMode": {
           "type": "string",
           "enum": [
             "Auto",
@@ -80,17 +80,17 @@
           "description": "%settings.comparisonPanelMode.description%",
           "default": "Auto"
         },
-        "sapling.isl.openBeside": {
+        "champagne.isl.openBeside": {
           "type": "boolean",
           "default": false,
           "description": "%settings.isl.openBeside.description%"
         },
-        "sapling.isl.showInSidebar": {
+        "champagne.isl.showInSidebar": {
           "type": "boolean",
           "default": false,
           "description": "%settings.isl.showInSidebar.description%"
         },
-        "sapling.isl.showOpenOrFocusButtonOnEditorTitle": {
+        "champagne.isl.showOpenOrFocusButtonOnEditorTitle": {
           "type": "boolean",
           "default": true,
           "description": "%settings.isl.showOpenOrFocusButtonOnEditorTitle.description%"
@@ -100,25 +100,25 @@
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "sapling",
+          "id": "champagne",
           "icon": "resources/champagne-viewContainer.svg",
-          "title": "%sapling.command-category%"
+          "title": "%champagne.command-category%"
         }
       ]
     },
     "views": {
-      "sapling": [
+      "champagne": [
         {
           "type": "webview",
-          "id": "sapling.isl",
+          "id": "champagne.isl",
           "name": "%isl.title%",
-          "when": "config.sapling.isl.showInSidebar"
+          "when": "config.champagne.isl.showInSidebar"
         }
       ],
       "scm": [
         {
           "type": "webview",
-          "id": "sapling.comments",
+          "id": "champagne.comments",
           "name": "Code Review Comments",
           "when": "isl.inlineCommentSidePanelEnabled"
         }
@@ -126,110 +126,110 @@
     },
     "commands": [
       {
-        "command": "sapling.revert-file",
-        "title": "%sapling.revert-file-command%",
-        "category": "%sapling.command-category%",
+        "command": "champagne.revert-file",
+        "title": "%champagne.revert-file-command%",
+        "category": "%champagne.command-category%",
         "icon": "$(discard)"
       },
       {
-        "command": "sapling.open-isl",
-        "title": "%sapling.open-isl-command%",
-        "category": "%sapling.command-category%",
+        "command": "champagne.open-isl",
+        "title": "%champagne.open-isl-command%",
+        "category": "%champagne.command-category%",
         "icon": "resources/champagne-favicon-light-green-transparent.svg"
       },
       {
-        "command": "sapling.open-file-diff-uncommitted",
-        "title": "%sapling.open-diff-uncommitted-command%",
-        "category": "%sapling.command-category%",
+        "command": "champagne.open-file-diff-uncommitted",
+        "title": "%champagne.open-diff-uncommitted-command%",
+        "category": "%champagne.command-category%",
         "icon": "$(git-pull-request-go-to-changes)"
       },
       {
-        "command": "sapling.open-file-diff-head",
-        "title": "%sapling.open-diff-head-command%",
-        "category": "%sapling.command-category%"
+        "command": "champagne.open-file-diff-head",
+        "title": "%champagne.open-diff-head-command%",
+        "category": "%champagne.command-category%"
       },
       {
-        "command": "sapling.open-file-diff-stack",
-        "title": "%sapling.open-diff-stack-command%",
-        "category": "%sapling.command-category%"
+        "command": "champagne.open-file-diff-stack",
+        "title": "%champagne.open-diff-stack-command%",
+        "category": "%champagne.command-category%"
       },
       {
-        "command": "sapling.open-comparison-view-uncommitted",
-        "title": "%sapling.open-comparison-view-uncommitted-command%",
-        "category": "%sapling.command-category%"
+        "command": "champagne.open-comparison-view-uncommitted",
+        "title": "%champagne.open-comparison-view-uncommitted-command%",
+        "category": "%champagne.command-category%"
       },
       {
-        "command": "sapling.open-comparison-view-head",
-        "title": "%sapling.open-comparison-view-head-command%",
-        "category": "%sapling.command-category%"
+        "command": "champagne.open-comparison-view-head",
+        "title": "%champagne.open-comparison-view-head-command%",
+        "category": "%champagne.command-category%"
       },
       {
-        "command": "sapling.open-comparison-view-stack",
-        "title": "%sapling.open-comparison-view-stack-command%",
-        "category": "%sapling.command-category%"
+        "command": "champagne.open-comparison-view-stack",
+        "title": "%champagne.open-comparison-view-stack-command%",
+        "category": "%champagne.command-category%"
       },
       {
-        "command": "sapling.open-comparison-view",
-        "title": "%sapling.open-comparison-view-command%",
+        "command": "champagne.open-comparison-view",
+        "title": "%champagne.open-comparison-view-command%",
         "when": false
       },
       {
-        "command": "sapling.isl.focus",
+        "command": "champagne.isl.focus",
         "title": "Focus Champagne Sidebar"
       },
       {
-        "command": "sapling.open-remote-file-link",
-        "title": "Open in Code Review",
-        "enablement": "sapling:hasRemoteLinkRepo"
+        "command": "champagne.open-remote-file-link",
+        "title": "Open Current File in Code Review",
+        "enablement": "champagne:hasRemoteLinkRepo"
       },
       {
-        "command": "sapling.copy-remote-file-link",
-        "title": "Copy Code Review Link",
-        "enablement": "sapling:hasRemoteLinkRepo"
+        "command": "champagne.copy-remote-file-link",
+        "title": "Copy Code Review Link for Current File",
+        "enablement": "champagne:hasRemoteLinkRepo"
       },
       {
-        "command": "sapling.open-comments",
-        "title": "%sapling.open-comments-command%",
+        "command": "champagne.open-comments",
+        "title": "%champagne.open-comments-command%",
         "enablement": "isl.inlineCommentSidePanelEnabled"
       },
       {
-        "command": "sapling.toggle-inline-comments",
-        "title": "%sapling.toggle-inline-comments-command%",
+        "command": "champagne.toggle-inline-comments",
+        "title": "%champagne.toggle-inline-comments-command%",
         "enablement": "isl.inlineCommentSidePanelEnabled"
       },
       {
-        "command": "sapling.debug.interpret-file-as-comments",
-        "title": "Debug: Load file as inline comments JSON",
-        "enablement": "sapling.isDev"
+        "command": "champagne.debug.interpret-file-as-comments",
+        "title": "Debug: Load File as Inline Code Review Comments (JSON)",
+        "enablement": "champagne.isDev"
       }
     ],
     "keybindings": [
       {
-        "command": "sapling.open-comparison-view-uncommitted",
+        "command": "champagne.open-comparison-view-uncommitted",
         "key": "ctrl-'",
         "mac": "cmd-'",
-        "when": "activeWebviewPanelId != 'sapling.isl'"
+        "when": "activeWebviewPanelId != 'champagne.isl'"
       },
       {
-        "command": "sapling.open-comparison-view-head",
+        "command": "champagne.open-comparison-view-head",
         "key": "ctrl-shift-'",
         "mac": "cmd-shift-'",
-        "when": "activeWebviewPanelId != 'sapling.isl'"
+        "when": "activeWebviewPanelId != 'champagne.isl'"
       },
       {
-        "command": "sapling.open-comments",
+        "command": "champagne.open-comments",
         "key": "alt-shift-g",
         "mac": "alt-shift-g",
-        "when": "isl.inlineCommentSidePanelEnabled && activeWebviewPanelId != 'sapling.comments'"
+        "when": "isl.inlineCommentSidePanelEnabled && activeWebviewPanelId != 'champagne.comments'"
       },
       {
-        "command": "sapling.toggle-inline-comments",
+        "command": "champagne.toggle-inline-comments",
         "key": "alt-shift-t",
         "mac": "alt-shift-t",
         "when": "isl.inlineCommentSidePanelEnabled"
       },
       {
-        "command": "sapling.open-isl",
+        "command": "champagne.open-isl",
         "key": "ctrl-shift-i",
         "mac": "cmd-shift-i",
         "when": "isl.openInteractiveSmartlogShortcutEnabled"
@@ -238,54 +238,54 @@
     "menus": {
       "editor/context": [
         {
-          "command": "sapling.open-remote-file-link",
-          "when": "sapling:hasRemoteLinkRepo"
+          "command": "champagne.open-remote-file-link",
+          "when": "champagne:hasRemoteLinkRepo"
         },
         {
-          "command": "sapling.copy-remote-file-link",
-          "when": "sapling:hasRemoteLinkRepo"
+          "command": "champagne.copy-remote-file-link",
+          "when": "champagne:hasRemoteLinkRepo"
         }
       ],
       "editor/title": [
         {
-          "command": "sapling.open-isl",
+          "command": "champagne.open-isl",
           "group": "navigation@-100",
-          "when": "config.sapling.isl.showOpenOrFocusButtonOnEditorTitle && isl.showButtonOnEditorTitle"
+          "when": "config.champagne.isl.showOpenOrFocusButtonOnEditorTitle && isl.showButtonOnEditorTitle"
         }
       ],
       "explorer/context": [
         {
-          "command": "sapling.open-remote-file-link",
-          "when": "sapling:hasRemoteLinkRepo && isFileSystemResource && resourceScheme =~ /^(?!output$|vscode-(?!remote|vfs$)).*$/"
+          "command": "champagne.open-remote-file-link",
+          "when": "champagne:hasRemoteLinkRepo && isFileSystemResource && resourceScheme =~ /^(?!output$|vscode-(?!remote|vfs$)).*$/"
         },
         {
-          "command": "sapling.copy-remote-file-link",
-          "when": "sapling:hasRemoteLinkRepo && isFileSystemResource && resourceScheme =~ /^(?!output$|vscode-(?!remote|vfs$)).*$/"
+          "command": "champagne.copy-remote-file-link",
+          "when": "champagne:hasRemoteLinkRepo && isFileSystemResource && resourceScheme =~ /^(?!output$|vscode-(?!remote|vfs$)).*$/"
         }
       ],
       "commandPalette": [
         {
-          "command": "sapling.isl.focus",
-          "when": "config.sapling.isl.showInSidebar"
+          "command": "champagne.isl.focus",
+          "when": "config.champagne.isl.showInSidebar"
         }
       ],
       "scm/resourceState/context": [
         {
-          "command": "sapling.open-file-diff-uncommitted",
+          "command": "champagne.open-file-diff-uncommitted",
           "group": "inline",
-          "when": "scmProvider == sapling && scmResourceGroup == changes"
+          "when": "scmProvider == champagne && scmResourceGroup == changes"
         },
         {
-          "command": "sapling.revert-file",
+          "command": "champagne.revert-file",
           "group": "inline",
-          "when": "scmProvider == sapling && scmResourceGroup == changes"
+          "when": "scmProvider == champagne && scmResourceGroup == changes"
         }
       ],
       "scm/title": [
         {
-          "command": "sapling.open-isl",
+          "command": "champagne.open-isl",
           "group": "navigation",
-          "when": "scmProvider == sapling"
+          "when": "scmProvider == champagne"
         }
       ]
     }

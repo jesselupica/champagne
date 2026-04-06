@@ -7,7 +7,7 @@ This extension provides an interactive commit graph UI directly inside VS Code.
 To launch it:
 
 - Run the **Champagne SCM: Open Champagne** command from the [command palette](https://code.visualstudio.com/docs/getstarted/userinterface#_command-palette).
-- Or [define a keyboard shortcut](https://code.visualstudio.com/docs/getstarted/keybindings) for the `sapling.open-isl` command.
+- Or [define a keyboard shortcut](https://code.visualstudio.com/docs/getstarted/keybindings) for the `champagne.open-isl` command.
 
 ## Requirements
 

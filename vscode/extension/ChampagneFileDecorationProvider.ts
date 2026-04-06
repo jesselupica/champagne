@@ -7,7 +7,7 @@
 
 import type {Logger} from 'isl-server/src/logger';
 import type {Disposable, Event} from 'vscode';
-import type {SaplingResourceGroup, VSCodeRepo} from './VSCodeRepo';
+import type {ChampagneResourceGroup, VSCodeRepo} from './VSCodeRepo';
 
 import {
   EventEmitter,
@@ -18,7 +18,7 @@ import {
   type FileDecorationProvider,
 } from 'vscode';
 
-export default class SaplingFileDecorationProvider implements FileDecorationProvider {
+export default class ChampagneFileDecorationProvider implements FileDecorationProvider {
   private readonly _onDidChangeDecorations = new EventEmitter<Uri[]>();
   readonly onDidChangeFileDecorations: Event<Uri[]> = this._onDidChangeDecorations.event;
 
@@ -51,7 +51,7 @@ export default class SaplingFileDecorationProvider implements FileDecorationProv
   }
 
   private collectDecorationData(
-    group: SaplingResourceGroup,
+    group: ChampagneResourceGroup,
     bucket: Map<string, FileDecoration>,
   ): void {
     for (const r of group.resourceStates) {

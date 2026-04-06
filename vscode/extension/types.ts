@@ -19,9 +19,9 @@ export type EnabledSCMApiFeature =
   | 'aiFirstPassCodeReview';
 
 export enum ActionTriggerType {
-  ISL2InlineComment = 'ISL2InlineComment', // provided from the Sapling ISL Inline Comment
-  ISL2SmartActions = 'ISL2SmartActions', // provided from the Sapling ISL Smart Actions Menu
-  ISL2CommitInfoView = 'ISL2CommitInfoView', // provided from the Sapling ISL Commit Info View
-  ISL2MergeConflictView = 'ISL2MergeConflictView', // provided from the Sapling ISL Merge Conflict View
-  ISL2SplitCommit = 'ISL2SplitCommit', // provided from the Sapling ISL Split Commit UI
+  ISL2InlineComment = 'ISL2InlineComment', // provided from the Champagne Inline Comment
+  ISL2SmartActions = 'ISL2SmartActions', // provided from the Champagne Smart Actions Menu
+  ISL2CommitInfoView = 'ISL2CommitInfoView', // provided from the Champagne Commit Info View
+  ISL2MergeConflictView = 'ISL2MergeConflictView', // provided from the Champagne Merge Conflict View
+  ISL2SplitCommit = 'ISL2SplitCommit', // provided from the Champagne Split Commit UI
 }

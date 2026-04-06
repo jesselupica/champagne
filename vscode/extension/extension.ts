@@ -8,7 +8,7 @@
 import type {Level} from 'isl-server/src/logger';
 import type {ServerPlatform} from 'isl-server/src/serverPlatform';
 import type {RepositoryContext} from 'isl-server/src/serverTypes';
-import type {SaplingExtensionApi} from './api/types';
+import type {ChampagneExtensionApi} from './api/types';
 import type {EnabledSCMApiFeature} from './types';
 
 import {makeServerSideTracker} from 'isl-server/src/analytics/serverSideTracker';
@@ -16,7 +16,7 @@ import {Logger} from 'isl-server/src/logger';
 import * as util from 'node:util';
 import * as vscode from 'vscode';
 import {DeletedFileContentProvider} from './DeletedFileContentProvider';
-import {registerSaplingDiffContentProvider} from './DiffContentProvider';
+import {registerChampagneDiffContentProvider} from './DiffContentProvider';
 import {Internal} from './Internal';
 import {VSCodeReposList} from './VSCodeRepo';
 import {makeExtensionApi} from './api/api';
@@ -30,7 +30,7 @@ import {getVSCodePlatform} from './vscodePlatform';
 
 export async function activate(
   context: vscode.ExtensionContext,
-): Promise<SaplingExtensionApi | undefined> {
+): Promise<ChampagneExtensionApi | undefined> {
   const start = Date.now();
   const [outputChannel, logger] = createOutputChannelLogger();
   const platform = getVSCodePlatform(context);
@@ -61,7 +61,7 @@ export async function activate(
     if (enabledSCMApiFeatures.has('blame')) {
       context.subscriptions.push(new InlineBlameProvider(reposList, ctx));
     }
-    context.subscriptions.push(registerSaplingDiffContentProvider(ctx));
+    context.subscriptions.push(registerChampagneDiffContentProvider(ctx));
     context.subscriptions.push(new DeletedFileContentProvider());
     let inlineCommentsProvider;
     if (enabledSCMApiFeatures.has('comments') && Internal.inlineCommentsProvider) {
@@ -84,10 +84,10 @@ export async function activate(
         }
       }
     }
-    if (Internal.SaplingISLUriHandler != null) {
+    if (Internal.ChampagneISLUriHandler != null) {
       context.subscriptions.push(
         vscode.window.registerUriHandler(
-          new Internal.SaplingISLUriHandler(reposList, ctx, inlineCommentsProvider),
+          new Internal.ChampagneISLUriHandler(reposList, ctx, inlineCommentsProvider),
         ),
       );
     }

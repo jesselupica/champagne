@@ -17,29 +17,29 @@
 import type * as vscode from 'vscode';
 
 /**
- * This API is exported from the meta.sapling-scm vscode extension.
- * It allows other vscode extensions to interact with Sapling & ISL.
+ * This API is exported from the champagne-scm vscode extension.
+ * It allows other vscode extensions to interact with Champagne.
  *
  * Usage:
  * ```
- * const api = await vscode.extensions.getExtension('meta.sapling-scm')?.activate();
+ * const api = await vscode.extensions.getExtension('jesselupica.champagne-scm')?.activate();
  * const repo = api?.getRepositoryForPath(cwd);
  * const currentCommit = repo?.getDotCommit();
  * const currentChanges = repo?.getUncommittedChanges();
  * ```
  */
-export interface SaplingExtensionApi {
+export interface ChampagneExtensionApi {
   version: '1';
 
-  getActiveRepositories(): SaplingRepository[];
+  getActiveRepositories(): ChampagneRepository[];
   onDidChangeActiveRepositories(
-    callback: (repositories: SaplingRepository[]) => void,
+    callback: (repositories: ChampagneRepository[]) => void,
   ): vscode.Disposable;
 
-  getRepositoryForPath(path: string): SaplingRepository | undefined;
+  getRepositoryForPath(path: string): ChampagneRepository | undefined;
 }
 
-export type SaplingRepositoryInfo = {
+export type ChampagneRepositoryInfo = {
   type: 'success';
   repoRoot: string;
   codeReviewSystem:
@@ -64,32 +64,32 @@ export type SaplingRepositoryInfo = {
       };
 };
 
-export interface SaplingRepository {
-  info: SaplingRepositoryInfo;
+export interface ChampagneRepository {
+  info: ChampagneRepositoryInfo;
 
   /**
-   * Run a Sapling command in this repo.
-   * `runSlCommand(['status'])` is equivalent to running `sl status` in the terminal.
+   * Run a VCS command in this repo.
+   * `runVcsCommand(['status'])` is equivalent to running `sl status` in the terminal.
    *
    * Generally, this should be used for read-only non-mutating commands (status, log, blame, ...),
    * and not mutating operations (pull, commit, rebase, ...),
    * in order to get queueing support and to show progress in the UI.
    */
-  runSlCommand(args: Array<string>): Promise<SaplingCommandOutput>;
+  runVcsCommand(args: Array<string>): Promise<ChampagneCommandOutput>;
 
   /**
    * Get the current commit ('.' revset) for this repo. This is cached from the last time it was requested.
    *
    */
-  getDotCommit(): SaplingCommitInfo | undefined;
+  getDotCommit(): ChampagneCommitInfo | undefined;
   /**
    * Subscribe to changes to the current commit ('.' revset) for this repo.
    */
-  onChangeDotCommit(callback: (commit: SaplingCommitInfo | undefined) => void): vscode.Disposable;
+  onChangeDotCommit(callback: (commit: ChampagneCommitInfo | undefined) => void): vscode.Disposable;
 
-  getUncommittedChanges(): ReadonlyArray<SaplingChangedFile>;
+  getUncommittedChanges(): ReadonlyArray<ChampagneChangedFile>;
   onChangeUncommittedChanges(
-    callback: (changes: ReadonlyArray<SaplingChangedFile>) => void,
+    callback: (changes: ReadonlyArray<ChampagneChangedFile>) => void,
   ): vscode.Disposable;
 
   /**
@@ -97,7 +97,7 @@ export interface SaplingRepository {
    *
    * Ordered from newest to oldest, with the current commit at the front.
    */
-  getCurrentStack(): Promise<ReadonlyArray<SaplingCommitInfo>>;
+  getCurrentStack(): Promise<ReadonlyArray<ChampagneCommitInfo>>;
 
   /**
    * Get all commits in the focused branch using focusedbranch(.) revset.
@@ -105,7 +105,7 @@ export interface SaplingRepository {
    *
    * Ordered from newest to oldest, with the current commit at the front.
    */
-  getFullFocusedBranch?(): Promise<ReadonlyArray<SaplingCommitInfo>>;
+  getFullFocusedBranch?(): Promise<ReadonlyArray<ChampagneCommitInfo>>;
 
   /**
    *
@@ -114,7 +114,7 @@ export interface SaplingRepository {
    */
   getDiff(commit?: string): Promise<string>;
 
-  diff(comparison: SaplingComparison, options?: {excludeGenerated?: boolean}): Promise<string>;
+  diff(comparison: ChampagneComparison, options?: {excludeGenerated?: boolean}): Promise<string>;
 
   /** Filter a list of repo-relative paths to only include generated (fully or partially) files. */
   getGeneratedPaths(paths: Array<string>): Promise<Array<string>>;
@@ -127,12 +127,12 @@ export interface SaplingRepository {
   /**
    * Get additional context around the source of a merge conflict.
    */
-  getMergeConflictContext(): Promise<SaplingConflictContext[]>;
+  getMergeConflictContext(): Promise<ChampagneConflictContext[]>;
 
   /**
    * Get diff info about the current commit.
    */
-  getCurrentCommitDiff(): Promise<SaplingCurrentCommitDiff>;
+  getCurrentCommitDiff(): Promise<ChampagneCurrentCommitDiff>;
 
   // TODO: refresh
   // TODO: moveFile / copyFile
@@ -141,7 +141,7 @@ export interface SaplingRepository {
 }
 
 type RepoRelativePath = string;
-export type SaplingCommitInfo = {
+export type ChampagneCommitInfo = {
   title: string;
   hash: string;
   author: string;
@@ -171,7 +171,7 @@ export type SaplingCommitInfo = {
   diffId?: string;
 };
 
-export type SaplingChangedFile = {
+export type ChampagneChangedFile = {
   path: RepoRelativePath;
   status: 'A' | 'M' | 'R' | '?' | '!' | 'U' | 'Resolved';
   /**
@@ -181,14 +181,14 @@ export type SaplingChangedFile = {
   copy?: RepoRelativePath;
 };
 
-export type SaplingCommandOutput = {
+export type ChampagneCommandOutput = {
   stdout: string;
   stderr: string;
   exitCode: number;
   killed?: boolean;
 };
 
-export type SaplingComparison =
+export type ChampagneComparison =
   | {
       type: 'Commit';
       hash: string;
@@ -197,7 +197,7 @@ export type SaplingComparison =
       type: 'Uncommitted' | 'Head' | 'Stack';
     };
 
-export type SaplingCurrentCommitDiff = {
+export type ChampagneCurrentCommitDiff = {
   message: string;
   files: ReadonlyArray<DiffFile>;
 };
@@ -259,7 +259,7 @@ export type DiffLine = {
 /**
  * Useful context about conflicting file(s)
  **/
-export type SaplingConflictContext = {
+export type ChampagneConflictContext = {
   // If we can guess the commit that introduced the conflicting content on the "local" side (or "dest" when rebasing):
   conflicting_local?: {description: string; diff: string; hash: string};
   // Info about the "other" (or "source" when rebasing) commit:

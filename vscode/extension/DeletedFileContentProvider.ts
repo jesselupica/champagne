@@ -7,7 +7,7 @@
 
 import * as vscode from 'vscode';
 
-export const DELETED_FILE_DIFF_VIEW_PROVIDER_SCHEME = 'sapling-deleted-file';
+export const DELETED_FILE_DIFF_VIEW_PROVIDER_SCHEME = 'champagne-deleted-file';
 
 /**
  * Provides empty content for deleted files, so they may be used in diff views.

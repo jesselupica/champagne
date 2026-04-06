@@ -94,8 +94,8 @@ let islPanelOrViewResult: ISLWebviewResult<vscode.WebviewPanel | vscode.WebviewV
   undefined;
 let hasOpenedISLWebviewBeforeState = false;
 
-const islViewType = 'sapling.isl';
-const comparisonViewType = 'sapling.comparison';
+const islViewType = 'champagne.isl';
+const comparisonViewType = 'champagne.comparison';
 
 /**
  * Creates or focuses the ISL webview and returns both the panel/view and a promise that resolves when the client is ready.
@@ -164,7 +164,7 @@ function createComparisonWebview(
 }
 
 function shouldUseWebviewView(): boolean {
-  return vscode.workspace.getConfiguration('sapling.isl').get<boolean>('showInSidebar') ?? false;
+  return vscode.workspace.getConfiguration('champagne.isl').get<boolean>('showInSidebar') ?? false;
 }
 
 export function hasOpenedISLWebviewBefore() {
@@ -232,10 +232,10 @@ export function registerISLCommands(
     }
   };
   return vscode.Disposable.from(
-    vscode.commands.registerCommand('sapling.open-isl', () => {
+    vscode.commands.registerCommand('champagne.open-isl', () => {
       if (shouldUseWebviewView()) {
         // just open the sidebar view
-        executeVSCodeCommand('sapling.isl.focus');
+        executeVSCodeCommand('champagne.isl.focus');
         return;
       }
       try {
@@ -245,13 +245,13 @@ export function registerISLCommands(
       }
     }),
     vscode.commands.registerCommand(
-      'sapling.open-isl-with-commit-message',
+      'champagne.open-isl-with-commit-message',
       async (title: string, description: string, mode?: 'commit' | 'amend', hash?: string) => {
         try {
           let readySignal: Deferred<void>;
 
           if (shouldUseWebviewView()) {
-            executeVSCodeCommand('sapling.isl.focus');
+            executeVSCodeCommand('champagne.isl.focus');
             // For webview views, use the readySignal from the provider
             readySignal = webviewViewProvider.readySignal;
           } else {
@@ -279,13 +279,13 @@ export function registerISLCommands(
       },
     ),
     vscode.commands.registerCommand(
-      'sapling.open-split-view-with-commits',
+      'champagne.open-split-view-with-commits',
       async (commits: Array<PartiallySelectedDiffCommit>, commitHash?: string) => {
         try {
           let readySignal: Deferred<void>;
 
           if (shouldUseWebviewView()) {
-            executeVSCodeCommand('sapling.isl.focus');
+            executeVSCodeCommand('champagne.isl.focus');
             readySignal = webviewViewProvider.readySignal;
           } else {
             const result = createOrFocusISLWebview(context, platform, logger);
@@ -324,7 +324,7 @@ export function registerISLCommands(
         }
       },
     ),
-    vscode.commands.registerCommand('sapling.close-isl', () => {
+    vscode.commands.registerCommand('champagne.close-isl', () => {
       if (!islPanelOrViewResult) {
         return;
       }
@@ -335,17 +335,17 @@ export function registerISLCommands(
         executeVSCodeCommand('workbench.action.closeSidebar');
       }
     }),
-    vscode.commands.registerCommand('sapling.open-comparison-view-uncommitted', () => {
+    vscode.commands.registerCommand('champagne.open-comparison-view-uncommitted', () => {
       createComparisonWebviewCommand({type: ComparisonType.UncommittedChanges});
     }),
-    vscode.commands.registerCommand('sapling.open-comparison-view-head', () => {
+    vscode.commands.registerCommand('champagne.open-comparison-view-head', () => {
       createComparisonWebviewCommand({type: ComparisonType.HeadChanges});
     }),
-    vscode.commands.registerCommand('sapling.open-comparison-view-stack', () => {
+    vscode.commands.registerCommand('champagne.open-comparison-view-stack', () => {
       createComparisonWebviewCommand({type: ComparisonType.StackChanges});
     }),
     /** Command that opens the provided Comparison argument. Intended to be used programmatically. */
-    vscode.commands.registerCommand('sapling.open-comparison-view', (comparison: unknown) => {
+    vscode.commands.registerCommand('champagne.open-comparison-view', (comparison: unknown) => {
       if (!isComparison(comparison)) {
         return;
       }
@@ -359,7 +359,7 @@ export function registerISLCommands(
     }),
     vscode.workspace.onDidChangeConfiguration(e => {
       // if we start using ISL as a view, dispose the panel
-      if (e.affectsConfiguration('sapling.isl.showInSidebar')) {
+      if (e.affectsConfiguration('champagne.isl.showInSidebar')) {
         if (islPanelOrViewResult && isPanel(islPanelOrViewResult.panel) && shouldUseWebviewView()) {
           islPanelOrViewResult.panel.dispose();
         }
@@ -379,7 +379,7 @@ function registerDeserializer(
       if (shouldUseWebviewView()) {
         // if we try to deserialize a panel while we're trying to use view, destroy the panel and open the sidebar instead
         webviewPanel.dispose();
-        executeVSCodeCommand('sapling.isl.focus');
+        executeVSCodeCommand('champagne.isl.focus');
         return Promise.resolve();
       }
       // Reset the webview options so we use latest uri for `localResourceRoots`.
@@ -462,7 +462,7 @@ function populateAndSetISLWebview<W extends vscode.WebviewPanel | vscode.Webview
     extraStyles: '',
     initialScript: nonce => `
     <script nonce="${nonce}" type="text/javascript">
-      window.saplingLanguage = "${locale /* important: locale has already been validated */}";
+      window.champagneLanguage = "${locale /* important: locale has already been validated */}";
       window.islAppMode = ${JSON.stringify(mode)};
     </script>
     ${getInitialStateJs(context, logger, nonce)}

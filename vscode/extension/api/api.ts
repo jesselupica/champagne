@@ -8,24 +8,24 @@
 import type {RepositoryContext} from 'isl-server/src/serverTypes';
 import type {VSCodeServerPlatform} from '../vscodePlatform';
 import type {VSCodeReposList} from '../VSCodeRepo';
-import type {SaplingExtensionApi, SaplingRepository} from './types';
+import type {ChampagneExtensionApi, ChampagneRepository} from './types';
 
 export function makeExtensionApi(
   platform: VSCodeServerPlatform,
   ctx: RepositoryContext,
   reposList: VSCodeReposList,
-): SaplingExtensionApi {
+): ChampagneExtensionApi {
   return {
     version: '1',
     getActiveRepositories() {
       return reposList.getCurrentActiveRepos();
     },
-    onDidChangeActiveRepositories(cb: (repositories: Array<SaplingRepository>) => unknown) {
+    onDidChangeActiveRepositories(cb: (repositories: Array<ChampagneRepository>) => unknown) {
       return reposList.observeActiveRepos(repos => {
         return cb(repos);
       });
     },
-    getRepositoryForPath(path: string): SaplingRepository | undefined {
+    getRepositoryForPath(path: string): ChampagneRepository | undefined {
       return reposList.repoForPath(path);
     },
   };

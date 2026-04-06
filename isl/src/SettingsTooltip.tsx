@@ -159,7 +159,7 @@ function SettingsDropdown({
             <>
               <T>How to submit code for code review on GitHub.</T>{' '}
               {/* TODO: update this to document branchign PRs */}
-              <Link href="https://sapling-scm.com/docs/git/intro#pull-requests">
+              <Link href="https://jesselupica.github.io/champagne/docs/git-pull-requests">
                 <T>Learn More</T>
               </Link>
             </>

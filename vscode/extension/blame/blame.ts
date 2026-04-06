@@ -88,7 +88,7 @@ export class InlineBlameProvider implements Disposable {
   }
 
   initBasedOnConfig() {
-    const config = 'sapling.showInlineBlame';
+    const config = 'champagne.showInlineBlame';
     const enableBlameByDefault =
       Internal?.shouldEnableBlameByDefault == null
         ? /* OSS */ true

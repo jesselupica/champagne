@@ -20,9 +20,9 @@ import {mockLogger} from 'shared/testUtils';
 import {nullthrows} from 'shared/utils';
 import * as vscode from 'vscode';
 import {
-  decodeSaplingDiffUri,
-  encodeSaplingDiffUri,
-  SaplingDiffContentProvider,
+  decodeChampagneDiffUri,
+  encodeChampagneDiffUri,
+  ChampagneDiffContentProvider,
 } from '../DiffContentProvider';
 
 const mockCancelToken = {} as vscode.CancellationToken;
@@ -105,13 +105,13 @@ describe('DiffContentProvider', () => {
     };
   });
 
-  const encodedFile1 = encodeSaplingDiffUri(
+  const encodedFile1 = encodeChampagneDiffUri(
     vscode.Uri.file('/path/to/repo/file1.txt'),
     beforeRevsetForComparison({type: ComparisonType.UncommittedChanges}),
   );
 
   it('provides file contents', async () => {
-    const provider = new SaplingDiffContentProvider(ctx);
+    const provider = new ChampagneDiffContentProvider(ctx);
 
     const repo = mockRepoAdded();
 
@@ -124,7 +124,7 @@ describe('DiffContentProvider', () => {
   });
 
   it('caches file contents', async () => {
-    const provider = new SaplingDiffContentProvider(ctx);
+    const provider = new ChampagneDiffContentProvider(ctx);
     const repo = mockRepoAdded();
     await provider.provideTextDocumentContent(encodedFile1, mockCancelToken);
     await provider.provideTextDocumentContent(encodedFile1, mockCancelToken);
@@ -135,7 +135,7 @@ describe('DiffContentProvider', () => {
   it('invalidates files when the repository head changes', async () => {
     const commit1 = {hash: '1'} as CommitInfo;
     const commit2 = {hash: '2'} as CommitInfo;
-    const provider = new SaplingDiffContentProvider(ctx);
+    const provider = new ChampagneDiffContentProvider(ctx);
     const onChange = jest.fn();
     const onChangeDisposable = provider.onDidChange(onChange);
     const repo = mockRepoAdded();
@@ -156,7 +156,7 @@ describe('DiffContentProvider', () => {
   it('invalidates file content cache when the repository head changes', async () => {
     const commit1 = {hash: '1'} as CommitInfo;
     const commit2 = {hash: '2'} as CommitInfo;
-    const provider = new SaplingDiffContentProvider(ctx);
+    const provider = new ChampagneDiffContentProvider(ctx);
     const repo = mockRepoAdded();
     repo.mockChangeHeadCommit(commit1);
 
@@ -172,7 +172,7 @@ describe('DiffContentProvider', () => {
 
   it('files opened before repo created provide content once repo is ready', async () => {
     mockNoActiveRepo();
-    const provider = new SaplingDiffContentProvider(ctx);
+    const provider = new ChampagneDiffContentProvider(ctx);
     const onChange = jest.fn();
     const onChangeDisposable = provider.onDidChange(onChange);
 
@@ -205,7 +205,7 @@ describe('DiffContentProvider', () => {
     });
     const commit1 = {hash: '1'} as CommitInfo;
     const commit2 = {hash: '2'} as CommitInfo;
-    const provider = new SaplingDiffContentProvider(ctx);
+    const provider = new ChampagneDiffContentProvider(ctx);
     const onChange = jest.fn();
     const onChangeDisposable = provider.onDidChange(onChange);
     const repo = mockRepoAdded();
@@ -239,7 +239,7 @@ describe('DiffContentProvider', () => {
       return {dispose: jest.fn()};
     });
     const commit2 = {hash: '2'} as CommitInfo;
-    const provider = new SaplingDiffContentProvider(ctx);
+    const provider = new ChampagneDiffContentProvider(ctx);
     const repo = mockRepoAdded();
     await provider.provideTextDocumentContent(encodedFile1, mockCancelToken);
     expect(repo.cat).toHaveBeenCalledTimes(1);
@@ -259,15 +259,15 @@ describe('DiffContentProvider', () => {
   });
 });
 
-describe('SaplingDiffEncodedUri', () => {
+describe('ChampagneDiffEncodedUri', () => {
   it('is reversible', () => {
-    const encoded = encodeSaplingDiffUri(
+    const encoded = encodeChampagneDiffUri(
       vscode.Uri.file('/path/to/myRepo'),
       currRevsetForComparison({
         type: ComparisonType.UncommittedChanges,
       }),
     );
-    const decoded = decodeSaplingDiffUri(encoded);
+    const decoded = decodeChampagneDiffUri(encoded);
     expect(decoded).toEqual({
       originalUri: expect.anything(),
       revset: 'wdir()',

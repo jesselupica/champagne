@@ -5,3 +5,4 @@ components/coverage/
 vscode-build/
 /*.tar.xz
 */vite.config*.timestamp-*.mjs
+*.vsix

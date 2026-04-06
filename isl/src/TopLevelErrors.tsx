@@ -70,7 +70,7 @@ function computeTopLevelError(
       const learnAboutGhButton = (
         <Button
           onClick={e => {
-            platform.openExternalLink('https://sapling-scm.com/docs/git/intro');
+            platform.openExternalLink('https://jesselupica.github.io/champagne/docs/git-intro');
             e.preventDefault();
             e.stopPropagation();
           }}>

@@ -86,7 +86,7 @@ const vscodeWebviewPlatform: Platform = {
     }
     window.clientToServerAPI?.postMessage({
       type: 'platform/executeVSCodeCommand',
-      command: 'sapling.open-comparison-view',
+      command: 'champagne.open-comparison-view',
       args: [comparison],
     });
     return true;

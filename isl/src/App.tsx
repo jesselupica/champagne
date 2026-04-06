@@ -211,7 +211,7 @@ function ISLNullState({repoError}: {repoError: RepositoryError}) {
                   key="help-button"
                   onClick={e => {
                     platform.openExternalLink(
-                      'https://sapling-scm.com/docs/introduction/installation',
+                      'https://jesselupica.github.io/champagne/docs/installation',
                     );
                     e.preventDefault();
                     e.stopPropagation();
@@ -262,7 +262,7 @@ function ISLNullState({repoError}: {repoError: RepositoryError}) {
                 key="help-button"
                 onClick={e => {
                   platform.openExternalLink(
-                    'https://sapling-scm.com/docs/introduction/installation',
+                    'https://jesselupica.github.io/champagne/docs/installation',
                   );
                   e.preventDefault();
                   e.stopPropagation();

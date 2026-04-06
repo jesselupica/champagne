@@ -37,7 +37,7 @@ You can use a development build of the VS Code extension by symlinking into this
 since `package.json` points to `dist/`:
 
 ```sh
-ln -s ./vscode ~/.vscode/extensions/meta.sapling-scm-100.0.0-dev
+ln -s ./vscode ~/.vscode/extensions/jesselupica.champagne-scm-100.0.0-dev
 ```
 
 **Debugging**

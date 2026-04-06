@@ -123,7 +123,7 @@ function OSSFileABug() {
       <Button
         xstyle={styles.centered}
         onClick={() => {
-          platform.openExternalLink('https://sapling-scm.com/docs/addons/isl');
+          platform.openExternalLink('https://jesselupica.github.io/champagne/');
         }}>
         <Icon icon="book" slot="start" />
         <T>View Documentation</T>
@@ -139,7 +139,7 @@ function OSSFileABug() {
       <Button
         xstyle={styles.centered}
         onClick={() => {
-          platform.openExternalLink('https://github.com/facebook/sapling/issues');
+          platform.openExternalLink('https://github.com/jesselupica/champagne/issues');
         }}>
         <Icon icon="bug" slot="start" />
         <T>Report an Issue on GitHub</T>
