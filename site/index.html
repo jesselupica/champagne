@@ -42,7 +42,10 @@
         <div class="nav-logo-wrap"><img src="assets/glass-favicon.png" alt="Champagne logo"></div>
         Champagne
       </a>
-      <ul class="flex items-center gap-8">
+      <button id="menu-toggle" class="md:hidden text-cream/70 hover:text-cream transition-colors" aria-label="Toggle menu">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+      </button>
+      <ul class="hidden md:flex items-center gap-8" id="nav-links">
         <li><a href="docs/" class="text-sm text-cream/70 hover:text-accent transition-colors font-medium">Docs</a></li>
         <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener" class="text-sm text-cream/70 hover:text-accent transition-colors font-medium">GitHub</a></li>
         <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener" class="text-sm text-cream/70 hover:text-accent transition-colors font-medium">VS Code Marketplace</a></li>
@@ -109,6 +112,11 @@
     <p class="text-xs text-cream/25">MIT License</p>
   </footer>
 
+  <script>
+    document.getElementById('menu-toggle').addEventListener('click', function() {
+      document.getElementById('nav-links').classList.toggle('open');
+    });
+  </script>
   <script>
     (function() {
       const container = document.getElementById('bubbles');
