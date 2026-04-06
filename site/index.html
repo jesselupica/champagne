@@ -114,7 +114,9 @@
 
   <script>
     document.getElementById('menu-toggle').addEventListener('click', function() {
-      document.getElementById('nav-links').classList.toggle('open');
+      var nav = document.getElementById('nav-links');
+      nav.classList.toggle('hidden');
+      nav.classList.toggle('open');
     });
   </script>
   <script>
