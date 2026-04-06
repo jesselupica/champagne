@@ -414,26 +414,6 @@ export class GitDriver implements VCSDriver {
       // even when a local branch with the same name is on the same commit.
       const remoteBookmarksList = remoteBranches.get(hash) ?? [];
 
-      // Get file list for draft commits (skip for public to avoid huge codemods)
-      let filePathsSample: RepoRelativePath[] = [];
-      let totalFileCount = 0;
-      if (phase === 'draft') {
-        try {
-          const filesResult = await this.runCommand(ctx, [
-            'diff-tree',
-            '--no-commit-id',
-            '-r',
-            '--name-only',
-            hash,
-          ]);
-          const files = filesResult.stdout.trim().split('\n').filter(Boolean);
-          totalFileCount = files.length;
-          filePathsSample = files.slice(0, 25);
-        } catch {
-          // Ignore
-        }
-      }
-
       // Build full description: body already excludes the subject line
       const description = body ? subject + '\n' + body : subject;
 
@@ -449,10 +429,54 @@ export class GitDriver implements VCSDriver {
         description,
         bookmarks,
         remoteBookmarks: remoteBookmarksList,
-        filePathsSample,
-        totalFileCount,
-        maxCommonPathPrefix: findMaxCommonPathPrefix([...filePathsSample]),
+        filePathsSample: [],
+        totalFileCount: 0,
+        maxCommonPathPrefix: '',
       });
+    }
+
+    // Batch-fetch file lists for all draft commits in a single git diff-tree call
+    // instead of spawning one process per commit (which caused O(n) process overhead).
+    const draftCommits = commits.filter(c => c.phase === 'draft');
+    if (draftCommits.length > 0) {
+      try {
+        const stdinInput = draftCommits.map(c => c.hash).join('\n') + '\n';
+        const batchResult = await this.runCommand(
+          ctx,
+          ['diff-tree', '--stdin', '-r', '--name-only'],
+          {input: stdinInput},
+        );
+        // Output format: each commit produces a line with the hash, followed by
+        // file lines. We parse by detecting 40-char hex lines as commit headers.
+        const lines = batchResult.stdout.split('\n');
+        let currentHash: string | null = null;
+        let currentFiles: string[] = [];
+        const filesByHash = new Map<string, string[]>();
+
+        for (const line of lines) {
+          if (/^[0-9a-f]{40}$/.test(line)) {
+            if (currentHash != null) {
+              filesByHash.set(currentHash, currentFiles);
+            }
+            currentHash = line;
+            currentFiles = [];
+          } else if (line && currentHash != null) {
+            currentFiles.push(line);
+          }
+        }
+        if (currentHash != null) {
+          filesByHash.set(currentHash, currentFiles);
+        }
+
+        for (const commit of draftCommits) {
+          const files = filesByHash.get(commit.hash) ?? [];
+          commit.totalFileCount = files.length;
+          commit.filePathsSample = files.slice(0, 25) as RepoRelativePath[];
+          commit.maxCommonPathPrefix = findMaxCommonPathPrefix([...commit.filePathsSample]);
+        }
+      } catch {
+        // Ignore — commits will just have empty file lists
+      }
     }
 
     attachStableLocations(commits, stableLocations);

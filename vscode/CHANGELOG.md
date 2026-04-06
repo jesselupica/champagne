@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.5
+
+### Apr 6 2026
+
+- Fix slow load times on large repos: batch diff-tree calls into a single process instead of spawning one per commit
+
 ## 0.1.4
 
 ### Apr 5 2026
