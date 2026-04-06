@@ -191,12 +191,43 @@ export class GitDriver implements VCSDriver {
     // remain "draft" even if pushed to a remote, matching Sapling's phase semantics.
     // We check origin/<trunk> first (remote truth), then fall back to local <trunk>.
     const publicHashes = new Set<string>();
-    const TRUNK_BRANCH_NAMES = ['main', 'master'];
-    for (const trunkBranch of TRUNK_BRANCH_NAMES) {
+
+    // Detect the default branch dynamically. Try symbolic-ref first (works when
+    // the remote HEAD is set, e.g. after a clone), then fall back to well-known names.
+    const trunkCandidates: string[] = [];
+    try {
+      const symResult = await this.runCommand(ctx, [
+        'symbolic-ref',
+        '--short',
+        'refs/remotes/origin/HEAD',
+      ]);
+      const detectedBranch = symResult.stdout.trim().replace(/^origin\//, '');
+      if (detectedBranch) {
+        trunkCandidates.push(detectedBranch);
+      }
+    } catch {
+      // symbolic-ref not set — fall through to well-known names
+    }
+    // Always include well-known names as fallback (deduped below)
+    for (const name of ['main', 'master']) {
+      if (!trunkCandidates.includes(name)) {
+        trunkCandidates.push(name);
+      }
+    }
+
+    // Limit how many public hashes we load. On large repos, rev-list can return
+    // millions of hashes. We cap it to avoid excessive memory usage — commits
+    // beyond this limit will appear as "draft" but that's acceptable.
+    const MAX_PUBLIC_HASHES = 50_000;
+    for (const trunkBranch of trunkCandidates) {
       // Try remote trunk first (authoritative for public status)
       for (const ref of [`origin/${trunkBranch}`, trunkBranch]) {
         try {
-          const trunkResult = await this.runCommand(ctx, ['rev-list', ref]);
+          const trunkResult = await this.runCommand(ctx, [
+            'rev-list',
+            '--max-count=' + MAX_PUBLIC_HASHES,
+            ref,
+          ]);
           for (const line of trunkResult.stdout.trim().split('\n')) {
             if (line) {
               publicHashes.add(line);
@@ -272,7 +303,10 @@ export class GitDriver implements VCSDriver {
       '%b',      // body (everything after first line)
     ].join('%x00') + RECORD_SEP;
 
-    // Build log args: always include HEAD, branches, and any stable/recommended locations
+    // Build log args: always include HEAD, branches, and any stable/recommended locations.
+    // Cap at MAX_LOG_COMMITS to avoid RangeError: Invalid string length on very large
+    // repos where git log --all output can exceed Node.js's string size limit.
+    const MAX_LOG_COMMITS = 10_000;
     const logArgs = [
       'log',
       // Exclude stash refs — stash commits (WIP on ..., index on ...) should never
@@ -281,12 +315,18 @@ export class GitDriver implements VCSDriver {
       '--all',
       '--format=' + format,
       '--topo-order',
+      '--max-count=' + MAX_LOG_COMMITS,
     ];
 
-    // Filter draft commits by date if maxDraftDays is set
+    // When maxDraftDays is set, let git filter by date so we avoid fetching the
+    // entire history on large repos. The JS-side draftDateCutoff below still acts
+    // as a secondary filter for edge cases (e.g. author date vs commit date).
     const draftDateCutoff = maxDraftDays != null
       ? new Date(Date.now() - maxDraftDays * 24 * 60 * 60 * 1000)
       : undefined;
+    if (draftDateCutoff != null) {
+      logArgs.push('--since=' + draftDateCutoff.toISOString());
+    }
 
     let logOutput: string;
     try {
@@ -294,6 +334,27 @@ export class GitDriver implements VCSDriver {
       logOutput = logResult.stdout;
     } catch {
       return [];
+    }
+
+    // When using --since, branch tips older than the cutoff are excluded by git.
+    // Fetch them separately so branches always appear in the UI regardless of age.
+    if (draftDateCutoff != null) {
+      try {
+        const branchTipArgs = [
+          'log',
+          '--format=' + format,
+          '--no-walk',
+          ...Array.from(localBranches.values())
+            .flatMap(names => names.split('\0'))
+            .map(name => 'refs/heads/' + name),
+        ];
+        if (branchTipArgs.length > 4) { // has actual branch refs beyond the base args
+          const tipsResult = await this.runCommand(ctx, branchTipArgs);
+          logOutput += tipsResult.stdout;
+        }
+      } catch {
+        // Branch tips query failed — continue with what we have
+      }
     }
 
     // Resolve stable locations and recommended bookmarks to hashes
@@ -309,6 +370,7 @@ export class GitDriver implements VCSDriver {
     }
 
     const commits: CommitInfo[] = [];
+    const seenHashes = new Set<string>();
     const records = logOutput.split(RECORD_SEP);
     for (const record of records) {
       const trimmed = record.trim();
@@ -320,6 +382,10 @@ export class GitDriver implements VCSDriver {
         continue;
       }
       const [hash, parentsStr, authorName, authorEmail, dateStr, subject, body] = fields;
+      if (seenHashes.has(hash)) {
+        continue;
+      }
+      seenHashes.add(hash);
       const parents = parentsStr ? parentsStr.split(' ').filter(Boolean) : [];
       const phase: CommitPhaseType = publicHashes.has(hash) ? 'public' : 'draft';
       const isDot = hash === headHash;
