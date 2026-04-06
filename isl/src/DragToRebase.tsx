@@ -9,8 +9,10 @@ import type {CommitInfo} from './types';
 
 import {Tooltip} from 'isl-components/Tooltip';
 import {useCallback, useEffect, useState} from 'react';
+import {bookmarkBeingDragged} from './Bookmark';
 import {t} from './i18n';
 import {readAtom, writeAtom} from './jotaiUtils';
+import {BookmarkMoveOperation} from './operations/BookmarkMoveOperation';
 import {REBASE_PREVIEW_HASH_PREFIX, RebaseOperation} from './operations/RebaseOperation';
 import {operationBeingPreviewed} from './operationsState';
 import {CommitPreview, dagWithPreviews, uncommittedChangesWithPreviews} from './previews';
@@ -83,6 +85,7 @@ export function DragToRebase({
   const handleDragEnter = useCallback(() => {
     // Capture the environment.
     const currentBeingDragged = commitBeingDragged;
+    const currentBookmarkDragged = bookmarkBeingDragged;
     const currentDndId = ++lastDndId;
 
     const handleDnd = () => {
@@ -90,6 +93,15 @@ export function DragToRebase({
       if (lastDndId != currentDndId) {
         return;
       }
+
+      // Handle bookmark drag: move a local branch to this commit
+      if (currentBookmarkDragged != null) {
+        writeAtom(operationBeingPreviewed, () =>
+          new BookmarkMoveOperation(currentBookmarkDragged.name, commit.hash),
+        );
+        return;
+      }
+
       const dag = readAtom(latestDag);
 
       if (currentBeingDragged != null && commit.hash !== currentBeingDragged.info.hash) {

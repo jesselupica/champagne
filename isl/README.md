@@ -1,24 +1,23 @@
-# Interactive Smartlog
+# Champagne Client
 
-Interactive Smartlog (ISL) is an embeddable, web-based GUI for Sapling.
-[See user documentation here](https://sapling-scm.com/docs/addons/isl).
+Champagne is an embeddable, web-based GUI for version control systems including Git, Sapling, and Graphite.
 
-The code for ISL lives in the addons folder:
+The code for Champagne lives in the following folders:
 
 | folder           | use                                                        |
 | ---------------- | ---------------------------------------------------------- |
 | isl              | Front end UI written with React and Jotai                  |
-| isl-server       | Back end, which runs sl commands / interacts with the repo |
+| isl-server       | Back end, which runs VCS commands / interacts with the repo |
 | isl-server/proxy | `sl web` CLI and server management                         |
 | shared           | Utils shared by other projects                             |
 | components       | Shareable component library                                |
-| vscode           | VS Code extension for Sapling, including ISL as a webview  |
+| vscode           | VS Code extension, including Champagne as a webview        |
 
 ## Development
 
 First run `yarn` to make sure all of the Node dependencies are installed.
 
-Use this command from the `addons/` folder to start ISL in development mode:
+Use this command to start Champagne in development mode:
 
 ```
 yarn dev browser --launch .
@@ -28,16 +27,16 @@ This does 3 things:
 
 - Build the client, and watch for changes (equivalent to `yarn start` in `isl/`)
 - Build the server, and watch for changes (equivalent to `yarn watch` in `isl-server/`)
-- Spawn a local server instance, which opens ISL in your browser (equivalent to `yarn serve` in `isl-server`, with some args). The server will open with `.` as the cwd. Use `--launch /path/to/my/repo` to use a different repository.
+- Spawn a local server instance, which opens Champagne in your browser (equivalent to `yarn serve` in `isl-server`, with some args). The server will open with `.` as the cwd. Use `--launch /path/to/my/repo` to use a different repository.
 
 The `yarn dev` command is a shorthand to running each of these in their own terminal.
 
 Note: the client and server build jobs will watch for changes. The webpage will hot reload as changes are made. The server must be restarted to pick up changes.
 Press `R` when running `yarn dev browser --launch CWD` to restart the server while leaving the build running.
 
-### Launching an ISL Server
+### Launching a Champagne Server
 
-To see more server output, you may sometimes want to use `yarn dev browser` WITHOUT `--launch` to build the client and server, and then launch the server yourself with `yarn serve`. This launches the local ISL server.
+To see more server output, you may sometimes want to use `yarn dev browser` WITHOUT `--launch` to build the client and server, and then launch the server yourself with `yarn serve`. This launches the local Champagne server.
 
 **In the `isl-server/` folder, run `yarn serve --dev` to start the server and open the browser**.
 You will have to manually restart it in order to pick up server changes.
@@ -59,7 +58,7 @@ yarn serve --dev --force --foreground --stdout
 ```
 
 - `--dev`: Connect to the vite dev build's hot-reloading front-end server (defaulting to 3000), even though this server will spawn on 3001.
-- `--force`: Kill any other active ISL server running on this port, which makes sure it's the latest version of the code.
+- `--force`: Kill any other active Champagne server running on this port, which makes sure it's the latest version of the code.
 - `--foreground`: instead of spawning the server in the background, run it in the foreground. `ctrl-c`-ing the `yarn serve` process will kill this server.
 - `--stdout`: when combined with `--foreground`, prints the server logs to stdout so you can read them directly in the `yarn serve` terminal output.
 - `--command sl`: override the command to use for `sl`, for example you might use `./sl`, or an alias to your local build like `lsl`, or `hg` for Meta-internal uses
@@ -104,20 +103,20 @@ You can disable this by passing HIDE_RTL_DOM_ERRORS as an env var:
 
 # Goals
 
-ISL is designed to be an opinionated UI. It does not implement every single feature or argument that the CLI supports.
-Rather, it implements an intuitive UI by leveraging a subset of features of the `sl` CLI.
+Champagne is designed to be an opinionated UI. It does not implement every single feature or argument that any single CLI supports.
+Rather, it implements an intuitive UI by leveraging a subset of features of the underlying VCS.
 
-ISL aims to optimize common workflows and provide an intuitive UX around some advanced workflows.
+Champagne aims to optimize common workflows and provide an intuitive UX around some advanced workflows.
 
-- **Opinionated**: ISL is opinionated about the "right" way to work.
+- **Opinionated**: Champagne is opinionated about the "right" way to work.
   This includes using stacks, amending commits, using one-commit-per-PR, rebasing to merge.
-- **Simple**: ISL hides unnecessary details and aims to be beginner-friendly.
+- **Simple**: Champagne hides unnecessary details and aims to be beginner-friendly.
   Each new button added to the UI makes it more intimidating to new users.
 - **User concepts, not machine concepts**:
-  ISL hides implementation details to present source control in a way a human would understand it.
+  Champagne hides implementation details to present source control in a way a human would understand it.
   The salient example of this is not showing commit hashes in the UI by default.
   Hashes are needed to refer to commits when typing in a CLI, but
-  ISL prefers being able to just click directly on commits, thus we don't need to show the hash by default.
+  Champagne prefers being able to just click directly on commits, thus we don't need to show the hash by default.
   Other examples of this include drag & drop to rebase, and showing PR info directly under a commit by leaning on one-PR-per-commit.
 - **Previews & Smoothness**: The UI should let you preview what action you'll take. It shows an optimistic
   version of the result of each command so the UI feels instant. We aim to avoid the UI _jumping_ between
@@ -128,13 +127,13 @@ ISL aims to optimize common workflows and provide an intuitive UX around some ad
 
 # Internals
 
-The following sections describe how ISL is implemented.
+The following sections describe how Champagne is implemented.
 
 ## Build / Bundling
 
-- All parts of ISL (client, server, vscode extension) are built with vite/rollup, which produces javascript/css bundles.
+- All parts of Champagne (client, server, vscode extension) are built with vite/rollup, which produces javascript/css bundles.
   This includes node_modules inside the bundle, which means we don't need to worry about including node_modules in builds.
-- `sl web` is a normal `sl` python command, which invokes the latest ISL built CLI.
+- `sl web` is a normal `sl` python command, which invokes the latest built CLI.
   `isl-server/proxy/run-proxy.ts` is the typescript entry point which is spawned by Python via `node`.
   In development mode, you interact directly with `run-proxy` rather than dealing with `sl web`.
   Note: there are slightly differences between the python `sl web` CLI args and the `run-proxy` CLI args.
@@ -142,7 +141,7 @@ The following sections describe how ISL is implemented.
 
 ## Architecture
 
-ISL uses an embeddable Client / Server architecture.
+Champagne uses an embeddable Client / Server architecture.
 
 - The Client runs in a browser-like context (web browser, VS Code webview, Electron renderer)
 - The Server runs in a node-like context (node server from `sl web`, VS Code extension host, Electron main)
@@ -171,13 +170,13 @@ which depends on if the UI is focused and visible.
 
 The server shells out to the `gh` CLI to make authenticated requests to GitHub.
 
-Most of the server's work is done by the `Repository` object, which represents a single Sapling repository.
+Most of the server's work is done by the `Repository` object, which represents a single repository.
 This object also delegates to manage Watchman subscriptions and GitHub fetching.
 
 ### Server reuse and sharing
 
-To support running `sl web` in multiple repos / cwds at the same time, ISL supports reusing server instances.
-When spawning an ISL server, if the port is already in use by an ISL server, that server will be reused.
+To support running `sl web` in multiple repos / cwds at the same time, Champagne supports reusing server instances.
+When spawning a Champagne server, if the port is already in use by a Champagne server, that server will be reused.
 
 Since the server acts like a normal http web server, it supports multiple clients connecting at the same time,
 both the static resources and WebSocket connections.
@@ -196,10 +195,10 @@ Note that client-side cached data is not shared, which means optimistic state ma
 in a second window for operations triggered in a different window.
 
 After all clients are disconnected, the server auto-shutdowns after one minute with no remaining repositories
-which helps ensure that old ISL servers aren't reused.
+which helps ensure that old Champagne servers aren't reused.
 
-Note that ISL exposes `--kill` and `--force` options to kill old servers and force a fresh server, to make
-it easy to work around unexpectedly reusing old ISL servers.
+Note that Champagne exposes `--kill` and `--force` options to kill old servers and force a fresh server, to make
+it easy to work around unexpectedly reusing old Champagne servers.
 
 ### Security
 
@@ -209,29 +208,29 @@ The approach we take is to generate a cryptographic token when a server is start
 Connecting via WebSocket to the server requires this token.
 The token is included in the url generated by `sl web`, which allows URLs from `sl web` to connect successfully.
 
-Because of this token, restarting the ISL server requires clicking a fresh link to use the new token.
-Once an ISL server stops running, its token is no longer valid.
+Because of this token, restarting the Champagne server requires clicking a fresh link to use the new token.
+Once a Champagne server stops running, its token is no longer valid.
 
-In order to support reusing ISL servers, we must persist the server's token to disk,
+In order to support reusing Champagne servers, we must persist the server's token to disk,
 so that later `sl web` invocations can find the right token to use.
 This persisted data includes the token but also some other metadata about the server,
 which is written to a permission-restricted file.
 
 Detail: we have a second token we use to verify that a server running on a port
-is actually an ISL server, to prevent misleading/phishing "reuses" of a server.
+is actually a Champagne server, to prevent misleading/phishing "reuses" of a server.
 
 ## Embedding
 
-ISL is designed to be embedded in multiple contexts. `sl web` is the default,
+Champagne is designed to be embedded in multiple contexts. `sl web` is the default,
 which is also the most complicated due to server reuse and managing tokens.
 
-The Sapling VS Code extension's ISL webview is another example of an embedding.
+The VS Code extension's webview is another example of an embedding.
 Other embeddings are possible, such as an Electron / Tauri standalone app, or
 other IDE extensions such as Android Studio.
 
 ### Platform
 
-To support running in multiple contexts, ISL has the notion of a Platform,
+To support running in multiple contexts, Champagne has the notion of a Platform,
 on both the client and server, which contains embedding-specific implementations
 of a common API.
 
@@ -250,7 +249,7 @@ Custom platforms can be implemented either by:
 
 ## Syncing repository state
 
-ISL started as a way to automatically re-run `sl status` and `sl smartlog` in a loop.
+Champagne started as a way to automatically re-run `sl status` and `sl smartlog` in a loop.
 The UI should always feel up-to-date, even though it needs to run these commands
 to actually fetch the data.
 The client subscribes to this data, which the server is in charge of fetching automatically.
@@ -264,7 +263,7 @@ Similarly, the server fetches new data from GitHub when the list of PRs changes,
 
 ## Running Operations
 
-ISL defines an "Operation" as any mutating `sl` command, such as `sl pull`, `sl rebase`, `sl goto`, `sl amend`, `sl add`, etc. Non-examples include `sl status`, `sl log`, `sl cat`, `sl diff`.
+Champagne defines an "Operation" as any mutating VCS command, such as `sl pull`, `sl rebase`, `sl goto`, `sl amend`, `sl add`, etc. Non-examples include `sl status`, `sl log`, `sl cat`, `sl diff`.
 
 The lifecycle of an operation looks like this:
 
@@ -281,7 +280,7 @@ We only get the "new" state of the world after _both_ the operation has complete
 This would cause the UI to appear laggy and out of date.
 Thus, we support using previews and optimistic to update the UI immediately.
 
-To support this, ISL defines a "`preview applier`" function for every operation.
+To support this, Champagne defines a "`preview applier`" function for every operation.
 The preview applier function describes how the DAG of commits and uncommitted changes
 would change as a result of running this operation.
 (Detail: there's actually a separate preview applier function for uncommitted changes and the commit DAG
@@ -318,24 +317,24 @@ with the latest successor hash. If you intentionally target an obsolete commit, 
 
 ## Internationalization
 
-ISL has a built-in i18n system, however the only language currently implemented is `en-US` English.
+Champagne has a built-in i18n system, however the only language currently implemented is `en-US` English.
 `t()` and `<T>` functions convert English strings or keys into values for other languages in the `isl/i18n/${languageCode}` folders. To add support for a new language, add a new `isl/i18n/${languageCode}/common.js`
 and provide translations for all the strings found by grepping for `t()` and `<T>` in `isl`.
 This system can be improved later as new languages are supported.
 
 # Debugging
 
-## ✅ Attaching ISL server to VS Code debugger
+## ✅ Attaching Champagne server to VS Code debugger
 
 There's a "Run & Debug isl-server" vscode build action which runs `yarn serve --dev` for you with a few additional arguments. When spawned from here, you can use breakpoints in VS Code to step through your server-side code.
 
 Note that you should have the client & server rollup compilation jobs (described above) running before doing this (it currently won't compile for you, just launch `yarn serve`).
 
-## ❓ Attaching ISL client to a debugger
+## ❓ Attaching Champagne client to a debugger
 
 Attaching the client to VS Code debugger does not work as well as the server side.
 There is currently no launch task to launch the browser and connect to the debugger.
-You can try using "Debug: Open Link" from the command palette, and paste in the ISL server link
+You can try using "Debug: Open Link" from the command palette, and paste in the Champagne server link
 (with the token included), but I found breakpoint line numbers don't match up correctly.
 
 You can open the chrome devtools, go to sources, search for files, and set breakpoints in there,

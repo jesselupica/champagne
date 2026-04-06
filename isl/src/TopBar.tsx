@@ -13,11 +13,11 @@ import {useAtomValue} from 'jotai';
 import {clearTrackedCache} from 'shared/LRU';
 import {BookmarksManagerMenu} from './BookmarksManager';
 import {BugButton} from './BugButton';
-import {BulkActionsMenu} from './BulkActionsMenu';
+
 import serverAPI from './ClientToServerAPI';
 import {CwdSelector} from './CwdSelector';
 import {DownloadCommitsTooltipButton} from './DownloadCommitsMenu';
-import {FocusModeToggle} from './FocusMode';
+
 import {generatedFileCache} from './GeneratedFile';
 import {PullButton} from './PullButton';
 import {SettingsGearButton} from './SettingsTooltip';
@@ -45,7 +45,7 @@ export function TopBar() {
         <CwdSelector />
         <DownloadCommitsTooltipButton />
         <ShelvedChangesMenu />
-        <BulkActionsMenu />
+
         <BookmarksManagerMenu />
         {Internal.FullRepoBranchButton && <Internal.FullRepoBranchButton />}
         <FetchingDataIndicator />
@@ -53,7 +53,7 @@ export function TopBar() {
       <span className="button-group">
         <FlexSpacer />
         <DebugToolsButton />
-        <FocusModeToggle />
+
         <BugButton />
         <SettingsGearButton />
         <RefreshButton />

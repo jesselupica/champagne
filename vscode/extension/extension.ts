@@ -109,7 +109,7 @@ export async function activate(
 }
 
 function createOutputChannelLogger(): [vscode.OutputChannel, Logger] {
-  const outputChannel = vscode.window.createOutputChannel('Sapling ISL');
+  const outputChannel = vscode.window.createOutputChannel('Champagne');
   const outputChannelLogger = new VSCodeOutputChannelLogger(outputChannel);
   return [outputChannel, outputChannelLogger];
 }

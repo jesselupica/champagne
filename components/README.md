@@ -1,6 +1,6 @@
 # addons/components/
 
-This directory contains a component library used internally by ISL, in an isolated shareable location.
+This directory contains a component library used internally by Champagne, in an isolated shareable location.
 
 This library is (visually) heavily based on the [VS Code Webview UI Toolkit](https://github.com/microsoft/vscode-webview-ui-toolkit), but slightly streamlined for react usage and doesn't share any code.
 It is visually almost identical, since it was used to migrate away from the toolkit without requiring restyling.

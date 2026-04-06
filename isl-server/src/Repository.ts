@@ -721,10 +721,14 @@ export class Repository {
     // Just send spawn immediately. Errors during spawn like ENOENT will still be reported by `exit`.
     onProgress('spawn');
     execution.stdout?.on('data', data => {
-      onProgress('stdout', data.toString());
+      const msg = data.toString();
+      ctx.logger.info('Command Output:', msg);
+      onProgress('stdout', msg);
     });
     execution.stderr?.on('data', data => {
-      onProgress('stderr', data.toString());
+      const msg = data.toString();
+      ctx.logger.warn('Command Stderr:', msg);
+      onProgress('stderr', msg);
     });
     signal.addEventListener('abort', () => {
       ctx.logger.log('kill operation: ', command, fullArgs.join(' '));

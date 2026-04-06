@@ -127,6 +127,8 @@ function renderGlyph(info: DagCommitInfo): RenderGlyphResult {
     return ['replace-tile', <YouAreHereGlyphWithProgress info={info} />];
   } else if (info.isMainHead) {
     return ['inside-tile', <MainHeadGlyph />];
+  } else if (info.remoteBookmarks.length > 0 && info.bookmarks.length === 0) {
+    return ['inside-tile', <MainHeadGlyph />];
   } else {
     return ['inside-tile', <HighlightedGlyph info={info} />];
   }

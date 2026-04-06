@@ -432,7 +432,7 @@ export function getLatestOperationInfo(operation: Operation): OperationInfo | un
   return info;
 }
 
-function runOperationImpl(operation: Operation): Promise<undefined | Error> {
+export function runOperationImpl(operation: Operation): Promise<undefined | Error> {
   // TODO: check for hashes in arguments that are known to be obsolete already,
   // and mark those to not be rewritten.
   serverAPI.postMessage({

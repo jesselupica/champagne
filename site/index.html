@@ -8,60 +8,130 @@
   <link rel="icon" href="assets/logo.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0a0806',
+            surface: '#1a1510',
+            accent: '#b28f61',
+            cream: '#faf4eb',
+            muted: '#302a23',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
   <link rel="stylesheet" href="css/styles.css">
 </head>
-<body>
-  <nav class="nav">
-    <a href="/" class="nav-brand">
-      <img src="assets/logo.png" alt="Champagne logo">
-      Champagne
-    </a>
-    <ul class="nav-links">
-      <li><a href="docs/">Docs</a></li>
-      <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener">GitHub</a></li>
-      <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener">VS Code Marketplace</a></li>
-    </ul>
+<body class="bg-bg font-sans">
+
+  <!-- Bubbles -->
+  <div class="bubbles" id="bubbles"></div>
+
+  <!-- Nav -->
+  <nav class="sticky top-0 z-50 bg-bg/90 backdrop-blur-md border-b border-muted/50">
+    <div class="max-w-6xl mx-auto flex items-center justify-between h-16 px-6">
+      <a href="/" class="flex items-center gap-3 text-cream font-semibold text-lg hover:opacity-80 transition-opacity">
+        <div class="nav-logo-wrap"><img src="assets/glass-favicon.png" alt="Champagne logo"></div>
+        Champagne
+      </a>
+      <ul class="flex items-center gap-8">
+        <li><a href="docs/" class="text-sm text-cream/70 hover:text-accent transition-colors font-medium">Docs</a></li>
+        <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener" class="text-sm text-cream/70 hover:text-accent transition-colors font-medium">GitHub</a></li>
+        <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener" class="text-sm text-cream/70 hover:text-accent transition-colors font-medium">VS Code Marketplace</a></li>
+      </ul>
+    </div>
   </nav>
 
-  <section class="hero">
-    <img src="assets/logo.png" alt="Champagne" class="hero-logo">
-    <h1>Champagne</h1>
-    <p class="hero-tagline">A toast. To a better workflow.</p>
-    <p class="hero-descriptor">Welcome to Champagne, a beautiful, streamlined UI built for an opinionated, agent-first development cycle.</p>
-    <a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" class="cta" target="_blank" rel="noopener">Install for VS Code</a>
+  <!-- Hero -->
+  <section class="relative min-h-[calc(100vh-4rem)] flex flex-col items-center justify-center text-center px-6 overflow-hidden">
+    <div class="hero-glow"></div>
+    <div class="relative z-10 flex flex-col items-center">
+      <div class="hero-logo-outer mb-10">
+        <div class="hero-logo-wrap">
+          <img src="assets/glass-favicon.png" alt="Champagne">
+        </div>
+      </div>
+      <h1 class="text-5xl md:text-7xl font-extrabold tracking-tight text-cream mb-6 leading-tight">
+        Champagne
+      </h1>
+      <p class="text-2xl md:text-3xl font-light text-accent mb-6 tracking-wide">
+        <span class="tagline-a inline-block">A toast.</span> <span class="tagline-b inline-block">To a better workflow.</span>
+      </p>
+      <p class="text-lg text-cream/50 max-w-xl mb-10 leading-relaxed">
+        Welcome to Champagne — a beautiful, streamlined UI built for an opinionated, agent-first development cycle.
+      </p>
+      <a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" class="cta" target="_blank" rel="noopener">
+        Install for VS Code
+      </a>
+    </div>
   </section>
 
-  <section class="features">
-    <div class="features-grid">
+  <!-- Features -->
+  <section class="max-w-6xl mx-auto px-6 py-24">
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
       <div class="feature-card">
-        <h3>Universal VCS</h3>
-        <p>Works with Git, Sapling, Graphite, and more. One interface for every version control system that supports feature branches.</p>
+        <h3 class="text-accent font-semibold text-lg mb-3">Universal VCS</h3>
+        <p class="text-cream/60 text-sm leading-relaxed">Works with Git, Sapling, Graphite, and more. One interface for every version control system that supports feature branches.</p>
       </div>
       <div class="feature-card">
-        <h3>Graphical Interface</h3>
-        <p>Visual commit graph, drag-to-rebase, interactive conflict resolution. See your repo the way you think about it.</p>
+        <h3 class="text-accent font-semibold text-lg mb-3">Graphical Interface</h3>
+        <p class="text-cream/60 text-sm leading-relaxed">Visual commit graph, drag-to-rebase, interactive conflict resolution. See your repo the way you think about it.</p>
       </div>
       <div class="feature-card">
-        <h3>VS Code Native</h3>
-        <p>Integrated extension that runs right in your editor. No context switching, no external tools.</p>
+        <h3 class="text-accent font-semibold text-lg mb-3">VS Code Native</h3>
+        <p class="text-cream/60 text-sm leading-relaxed">Integrated extension that runs right in your editor. No context switching, no external tools.</p>
       </div>
     </div>
   </section>
 
-  <section class="screenshot">
+  <!-- Screenshot -->
+  <section class="max-w-6xl mx-auto px-6 pb-24">
     <div class="screenshot-frame">
-      Screenshot coming soon
+      <span class="text-muted text-sm">Screenshot coming soon</span>
     </div>
   </section>
 
-  <footer class="footer">
-    <ul class="footer-links">
-      <li><a href="docs/">Docs</a></li>
-      <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener">GitHub</a></li>
-      <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener">VS Code Marketplace</a></li>
+  <!-- Footer -->
+  <footer class="border-t border-muted/50 py-12 text-center">
+    <ul class="flex justify-center gap-8 mb-6">
+      <li><a href="docs/" class="text-sm text-cream/50 hover:text-accent transition-colors">Docs</a></li>
+      <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener" class="text-sm text-cream/50 hover:text-accent transition-colors">GitHub</a></li>
+      <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener" class="text-sm text-cream/50 hover:text-accent transition-colors">VS Code Marketplace</a></li>
     </ul>
-    <p class="footer-license">MIT License</p>
+    <p class="text-xs text-cream/25">MIT License</p>
   </footer>
+
+  <script>
+    (function() {
+      const container = document.getElementById('bubbles');
+      const COUNT = 15;
+      for (let i = 0; i < COUNT; i++) {
+        const b = document.createElement('div');
+        b.className = 'bubble';
+        const size = 4 + Math.random() * 8;
+        const left = 5 + Math.random() * 90;
+        const duration = 12 + Math.random() * 18;
+        const delay = Math.random() * 6;
+        const drift = -20 + Math.random() * 40;
+        b.style.cssText = `
+          width: ${size}px;
+          height: ${size}px;
+          left: ${left}%;
+          animation-duration: ${duration}s;
+          animation-delay: ${delay}s;
+          --drift: ${drift}px;
+        `;
+        container.appendChild(b);
+      }
+    })();
+  </script>
 </body>
 </html>

@@ -974,7 +974,7 @@ function SubmitButton({
           <div className="commit-info-confirm-modal-paragraphs">
             <div>
               <T replace={{$pr: <code>sl pr</code>, $ghstack: <code>sl ghstack</code>}}>
-                You can configure Sapling to use either $pr or $ghstack to submit for code review on
+                You can configure either $pr or $ghstack to submit for code review on
                 GitHub.
               </T>
             </div>

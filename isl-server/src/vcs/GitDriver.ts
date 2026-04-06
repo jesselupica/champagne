@@ -326,11 +326,13 @@ export class GitDriver implements VCSDriver {
       const commitDate = new Date(dateStr);
 
       // Apply date filter for draft commits, but always include:
-      // - public commits, HEAD, stable locations, recommended bookmarks
+      // - public commits, HEAD, stable locations, recommended bookmarks,
+      //   and commits with local branches (so branch tags are always visible)
       if (
         draftDateCutoff != null &&
         phase === 'draft' &&
         !isDot &&
+        !localBranches.has(hash) &&
         !stableHashes.has(hash) &&
         !recommendedBranchHashes.has(hash) &&
         commitDate < draftDateCutoff
@@ -342,7 +344,8 @@ export class GitDriver implements VCSDriver {
       const bookmarksStr = localBranches.get(hash);
       const bookmarks = bookmarksStr ? bookmarksStr.split('\0') : [];
 
-      // Get remote bookmarks for this commit
+      // Always include remote bookmarks so the UI can show where the remote is,
+      // even when a local branch with the same name is on the same commit.
       const remoteBookmarksList = remoteBranches.get(hash) ?? [];
 
       // Get file list for draft commits (skip for public to avoid huge codemods)
@@ -1213,6 +1216,13 @@ export class GitDriver implements VCSDriver {
       if (args[1] === '--delete') {
         return {args: ['branch', '-d', args[2]], stdin};
       }
+      if (args[1] === '--move') {
+        // bookmark --move NAME --rev HASH → git branch -f NAME HASH
+        const name = args[2];
+        const revIdx = args.indexOf('--rev');
+        const hash = revIdx !== -1 ? args[revIdx + 1] : 'HEAD';
+        return {args: ['branch', '-f', name, hash], stdin};
+      }
       // bookmark NAME --rev HASH → branch NAME HASH
       const name = args[1];
       const revIdx = args.indexOf('--rev');
@@ -1357,7 +1367,12 @@ export class GitDriver implements VCSDriver {
     if (args[0] === 'resolve') {
       if (args.includes('--mark')) {
         const files = args.filter(a => a !== 'resolve' && a !== '--mark');
-        return {args: ['add', ...files], stdin};
+        // Use a shell script to handle both existing files (git add) and
+        // deleted files (git rm) — e.g. rename conflicts where the original
+        // file no longer exists on disk.
+        const fileArgs = files.map(f => `"${String(f).replace(/"/g, '\\"')}"`).join(' ');
+        const script = `for f in ${fileArgs}; do if [ -e "$f" ]; then git add -- "$f"; else git rm -f -- "$f" 2>/dev/null || true; fi; done`;
+        return {args: ['__shell__', script], stdin};
       }
       if (args.includes('--unmark')) {
         const files = args.filter(a => a !== 'resolve' && a !== '--unmark');

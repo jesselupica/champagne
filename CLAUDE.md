@@ -113,6 +113,10 @@ cd shared && yarn add <package>       # Shared
 - **Watching**: Watchman (preferred) or polling fallback
 - **UI**: Optimistic updates, operation queuing
 
+## Important Rules
+
+- **Never run the Champagne app (server/dev) against the champagne repo itself.** Use `scripts/test-git-repo.sh` to create a separate test repo for testing the UI.
+
 ## Troubleshooting
 
 - **Port conflicts**: `yarn serve --force --dev`

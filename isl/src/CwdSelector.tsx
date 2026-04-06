@@ -410,7 +410,7 @@ export function CwdSelections({dismiss, divider}: {dismiss: () => unknown; divid
           value: id,
           tooltip: valid
             ? id
-            : t('Path $path does not appear to be a valid Sapling repository', {
+            : t('Path $path does not appear to be a valid repository', {
                 replace: {$path: id},
               }),
           disabled: !valid,

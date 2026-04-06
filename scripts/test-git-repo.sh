@@ -2,12 +2,27 @@
 set -e
 
 # Parse arguments
-VCS_TYPE="${1:-git}"
-if [[ "$VCS_TYPE" != "sapling" && "$VCS_TYPE" != "git" ]]; then
-  echo "Usage: $0 [sapling|git]"
-  echo "  Default: sapling"
-  exit 1
-fi
+VCS_TYPE="git"
+USE_WORKTREE=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --worktree)
+      USE_WORKTREE=true
+      shift
+      ;;
+    sapling|git)
+      VCS_TYPE="$1"
+      shift
+      ;;
+    *)
+      echo "Usage: $0 [sapling|git] [--worktree]"
+      echo "  Default: git"
+      echo "  --worktree  Create a git worktree and run the server against it"
+      exit 1
+      ;;
+  esac
+done
 
 # Capture script directory before any cd
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -139,6 +154,16 @@ for branch in main feature/login feature/dashboard bugfix/navbar onto-me-for-mer
   git branch --set-upstream-to="origin/$branch" "$branch" 2>/dev/null || true
 done
 
+# Optionally create a worktree
+SERVE_DIR="$TEST_REPO"
+if [ "$USE_WORKTREE" = true ]; then
+  WORKTREE_DIR="/tmp/champagne-worktree-$(date +%s)"
+  echo "Creating git worktree at: $WORKTREE_DIR (branch: feature/login)"
+  cd "$TEST_REPO"
+  git worktree add "$WORKTREE_DIR" feature/login
+  SERVE_DIR="$WORKTREE_DIR"
+fi
+
 echo ""
 echo "✓ Test repository created with:"
 echo "  - main branch (3 commits)"
@@ -149,8 +174,14 @@ echo "  - onto-me-for-merge-conflict branch (1 commit, rebase target)"
 echo "  - rebase-me branch (1 commit, rebase this onto the above for conflicts)"
 echo "  Conflict types: content, delete/modify, add/add, rename/rename"
 echo "  - bare remote at: $BARE_REMOTE"
+if [ "$USE_WORKTREE" = true ]; then
+  echo "  - worktree at: $WORKTREE_DIR (feature/login)"
+fi
 echo ""
 echo "Repository location: $TEST_REPO"
+if [ "$USE_WORKTREE" = true ]; then
+  echo "Serving from worktree: $SERVE_DIR"
+fi
 echo ""
 echo "========================================"
 echo "Installing dependencies & building..."
@@ -211,7 +242,7 @@ CLIENT_PID=$!
 
 # Start the ISL server in the background (so trap can catch signals)
 cd "$CHAMPAGNE_ROOT/isl-server" || exit 1
-yarn serve --dev --foreground --stdout --force --vcs-type "$VCS_TYPE" --cwd "$TEST_REPO" 2>&1 | tee "$SERVER_LOG" &
+yarn serve --dev --foreground --stdout --force --vcs-type "$VCS_TYPE" --cwd "$SERVE_DIR" 2>&1 | tee "$SERVER_LOG" &
 SERVER_PID=$!
 
 # Wait for either process to exit

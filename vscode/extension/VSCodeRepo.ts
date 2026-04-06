@@ -208,7 +208,7 @@ export class VSCodeRepo implements vscode.QuickDiffProvider, SaplingRepository {
 
     this.sourceControl = vscode.scm.createSourceControl(
       'sapling',
-      t('Sapling'),
+      t('Champagne'),
       vscode.Uri.file(repo.info.repoRoot),
     );
     this.sourceControl.quickDiffProvider = this;

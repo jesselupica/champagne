@@ -1,8 +1,6 @@
 # Champagne
 
-A universal VCS GUI - bringing ISL's excellent interface to any version control system.
-
-Champagne is a fork of Interactive Smartlog (ISL) from Sapling SCM, refactored to support multiple version control systems through a pluggable driver architecture.
+A universal, graphical source control GUI for Git, Sapling, Graphite, and more.
 
 ## Quick Start
 
@@ -28,8 +26,8 @@ See [claude.md](./claude.md) for comprehensive documentation including:
 
 ## What's Included
 
-- **ISL Web App**: React-based UI for version control visualization
-- **ISL Server**: Node.js backend for repository operations
+- **Web App**: React-based UI for source control visualization
+- **Server**: Node.js backend for repository operations
 - **VSCode Extension**: Full IDE integration
 - **Shared Libraries**: Reusable components and utilities
 
@@ -39,4 +37,5 @@ MIT License - See [LICENSE](./LICENSE) file for details.
 
 ## Original Project
 
-This project is a fork of the ISL components from [Sapling SCM](https://sapling-scm.com/).
+This project is based on Interactive Smartlog (ISL) from [Sapling SCM](https://sapling-scm.com/),
+refactored to support multiple version control systems through a pluggable driver architecture.

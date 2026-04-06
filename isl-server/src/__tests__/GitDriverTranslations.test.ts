@@ -354,10 +354,12 @@ describe('GitDriver.normalizeOperationArgs', () => {
   });
 
   describe('resolve', () => {
-    it('translates resolve --mark file to add file', () => {
-      expect(translate(['resolve', '--mark', 'conflict.txt'])).toEqual({
-        args: ['add', 'conflict.txt'],
-      });
+    it('translates resolve --mark file to shell that handles add or rm', () => {
+      const result = translate(['resolve', '--mark', 'conflict.txt']);
+      expect(result.args[0]).toBe('__shell__');
+      expect(result.args[1]).toContain('git add -- "$f"');
+      expect(result.args[1]).toContain('git rm -f -- "$f"');
+      expect(result.args[1]).toContain('conflict.txt');
     });
 
     it('translates resolve --unmark file to rm --cached file', () => {

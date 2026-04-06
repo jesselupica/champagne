@@ -428,7 +428,7 @@ function ExternalMergeToolSetting() {
                   </>
                 ),
               }}>
-              You can configure Sapling and ISL to use a custom external merge tool, which is used
+              You can configure a custom external merge tool, which is used
               when a merge conflict is detected.$br Define your tool with $configedit (or with
               $local to configure only for the current repository), by setting $mymergetool and
               $uimerge$brCLI merge tools like vimdiff won't be used from ISL. Ensure $gui is set to

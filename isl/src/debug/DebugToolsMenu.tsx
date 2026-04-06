@@ -59,7 +59,7 @@ export default function DebugToolsMenu({dismiss}: {dismiss: () => unknown}) {
       className="internal-debug-tools-dropdown">
       <Subtle>
         <T>
-          This data is only intended for debugging Interactive Smartlog and may not capture all
+          This data is only intended for debugging Champagne and may not capture all
           issues.
         </T>
       </Subtle>

@@ -760,6 +760,33 @@ function runVCSDriverTests(
         commits = await driver.fetchCommits(ctx, {type: 'none'}, defaultFetchOptions);
         expect(commits.find(c => c.hash === hashA)!.bookmarks).not.toContain('feature');
       });
+
+      it('old branch commits survive date cutoff', async () => {
+        await helpers.commit(tmpDir, 'base', 'base.txt', 'base');
+        const baseHash = await helpers.getHead(tmpDir);
+
+        // Create a branch with an old commit (30 days ago)
+        await helpers.createAndCheckoutBranch(tmpDir, 'old-feature');
+        const oldDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        await execFile(
+          'git',
+          ['commit', '--allow-empty', '-m', 'old feature work', '--date', oldDate],
+          {cwd: tmpDir, env: {...process.env, GIT_COMMITTER_DATE: oldDate}},
+        );
+        const oldHash = await helpers.getHead(tmpDir);
+
+        // Switch back so old-feature commit is not HEAD
+        await helpers.checkout(tmpDir, baseHash);
+
+        // Fetch with a 14-day cutoff — old branch should still appear
+        const commits = await driver.fetchCommits(ctx, {type: 'none'}, {
+          ...defaultFetchOptions,
+          maxDraftDays: 14,
+        });
+        const oldCommit = commits.find(c => c.hash === oldHash);
+        expect(oldCommit).toBeDefined();
+        expect(oldCommit!.bookmarks).toContain('old-feature');
+      });
     });
 
     // ── Rebase ────────────────────────────────────────

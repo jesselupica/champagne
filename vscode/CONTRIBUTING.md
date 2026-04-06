@@ -1,7 +1,7 @@
-# Sapling VS Code extension
+# Champagne VS Code extension
 
 This folder contains the VS Code extension,
-including the Sapling SCM provider and embedded ISL.
+including the SCM provider and embedded Champagne UI.
 
 > NOTE: This file acts as the technical `README` for the `vscode/` folder,
 > while `README.md` is the user-facing description of the extension visible in the extension marketplace.

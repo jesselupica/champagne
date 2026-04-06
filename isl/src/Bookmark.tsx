@@ -17,7 +17,7 @@ import {Tag} from 'isl-components/Tag';
 import {TextField} from 'isl-components/TextField';
 import {Tooltip} from 'isl-components/Tooltip';
 import {useAtomValue} from 'jotai';
-import {useState} from 'react';
+import {useCallback, useState} from 'react';
 import {useContextMenu} from 'shared/ContextMenu';
 import {spacing} from '../../components/theme/tokens.stylex';
 import {tracker} from './analytics';
@@ -32,7 +32,8 @@ import {T, t} from './i18n';
 import {Internal} from './Internal';
 import {BookmarkCreateOperation} from './operations/BookmarkCreateOperation';
 import {BookmarkDeleteOperation} from './operations/BookmarkDeleteOperation';
-import {useRunOperation} from './operationsState';
+import {readAtom, writeAtom} from './jotaiUtils';
+import {operationBeingPreviewed, runOperationImpl, useRunOperation} from './operationsState';
 import {latestSuccessorUnlessExplicitlyObsolete} from './successionUtils';
 import {showModal} from './useModal';
 
@@ -50,10 +51,36 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing.quarter,
   },
+  draggableBookmarkTag: {
+    cursor: 'grab',
+  },
   modalButtonBar: {
     justifyContent: 'flex-end',
   },
 });
+
+/** Global state for bookmark being dragged — mirrors the commitBeingDragged pattern in DragToRebase. */
+export let bookmarkBeingDragged: {name: string} | undefined = undefined;
+
+function handleBookmarkDragEnd(event: Event) {
+  event.preventDefault();
+  bookmarkBeingDragged = undefined;
+  const draggedDOMNode = event.target;
+  draggedDOMNode?.removeEventListener('dragend', handleBookmarkDragEnd);
+  document.removeEventListener('drop', preventDefaultForBookmarkDrag);
+  document.removeEventListener('dragover', preventDefaultForBookmarkDrag);
+
+  // Auto-confirm the bookmark move on drop
+  const op = readAtom(operationBeingPreviewed);
+  if (op != null) {
+    writeAtom(operationBeingPreviewed, undefined);
+    runOperationImpl(op);
+  }
+}
+
+function preventDefaultForBookmarkDrag(e: Event) {
+  e.preventDefault();
+}
 
 export type BookmarkKind = 'remote' | 'local' | 'stable';
 
@@ -135,11 +162,30 @@ export function Bookmark({
     logExposureOncePerSession(bookmark);
   }
 
+  const isDraggable = kind === 'local';
+
+  const handleDragStart = useCallback(
+    (event: React.DragEvent<HTMLSpanElement>) => {
+      bookmarkBeingDragged = {name: bookmark};
+      event.dataTransfer.dropEffect = 'move';
+      event.stopPropagation(); // Don't trigger commit drag
+
+      const draggedDOMNode = event.target;
+      draggedDOMNode.addEventListener('dragend', handleBookmarkDragEnd);
+      document.addEventListener('drop', preventDefaultForBookmarkDrag);
+      document.addEventListener('dragover', preventDefaultForBookmarkDrag);
+    },
+    [bookmark],
+  );
+
   const inner = (
     <Tag
       onContextMenu={contextMenu}
+      draggable={isDraggable}
+      onDragStart={isDraggable ? handleDragStart : undefined}
       xstyle={[
         kind === 'stable' && styles.stable,
+        isDraggable && styles.draggableBookmarkTag,
         styles.bookmarkTag,
         fullLength === true && styles.fullLength,
       ]}>
@@ -168,10 +214,18 @@ export function AllBookmarksTruncated({
   const FullRepoBranchBookmark = Internal.FullRepoBranchBookmark;
   const compareFullRepoBranch = Internal.compareFullRepoBranch;
 
+  // Hide remote bookmarks (e.g. "origin/foo") when the corresponding local
+  // bookmark ("foo") is on the same commit — local is the source of truth.
+  const localSet = new Set(local);
+  const filteredRemote = remote.filter(rb => {
+    const shortName = rb.replace(/^[^/]+\//, '');
+    return !localSet.has(shortName);
+  });
+
   const finalBookmarks = (
     [
       ['local', local],
-      ['remote', remote],
+      ['remote', filteredRemote],
       ['stable', stable],
     ] as const
   )

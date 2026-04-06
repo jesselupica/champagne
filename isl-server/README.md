@@ -1,6 +1,6 @@
 # isl-server
 
-This is the server-side code for Interactive Smartlog. It handles
+This is the server-side code for Champagne. It handles
 running commands and reporting information to the UI.
 
 The server code is bundled with rollup directly into the entry points using it.

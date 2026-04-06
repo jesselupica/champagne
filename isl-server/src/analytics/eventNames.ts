@@ -34,6 +34,7 @@ export type TrackEventName =
   | 'BookmarksCommand'
   | 'BookmarkCreateOperation'
   | 'BookmarkDeleteOperation'
+  | 'BookmarkMoveOperation'
   | 'CommitOperation'
   | 'CommitFileSubsetOperation'
   | 'ContinueMergeOperation'

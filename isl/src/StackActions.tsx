@@ -10,7 +10,7 @@ import type {Hash} from './types';
 
 import {Button} from 'isl-components/Button';
 import {Icon} from 'isl-components/Icon';
-import {DOCUMENTATION_DELAY, Tooltip} from 'isl-components/Tooltip';
+import {Tooltip} from 'isl-components/Tooltip';
 import {useAtom, useAtomValue} from 'jotai';
 import {type ContextMenuItem, useContextMenu} from 'shared/ContextMenu';
 import {CleanupButton, isStackEligibleForCleanup} from './Cleanup';
@@ -27,9 +27,7 @@ import {IconStack} from './icons/IconStack';
 import {useRunOperation} from './operationsState';
 import {useUncommittedSelection} from './partialSelection';
 import {dagWithPreviews} from './previews';
-import {latestUncommittedChangesData} from './serverAPIState';
-import {useConfirmUnsavedEditsBeforeSplit} from './stackEdit/ui/ConfirmUnsavedEditsBeforeSplit';
-import {StackEditIcon} from './stackEdit/ui/StackEditIcon';
+
 import {editingStackIntentionHashes, loadingStackState} from './stackEdit/ui/stackEditState';
 import {succeedableRevset} from './types';
 
@@ -226,9 +224,6 @@ export function StackActions({hash}: {hash: Hash}): React.ReactElement | null {
   }
 
   const hasChildren = dag.childHashes(hash).size > 0;
-  if (hasChildren) {
-    actions.push(<StackEditButton key="edit-stack" info={info} />);
-  }
 
   if (showCleanupButton) {
     actions.push(<CleanupButton key="cleanup" commit={info} hasChildren={hasChildren} />);
@@ -254,71 +249,6 @@ export function StackActions({hash}: {hash: Hash}): React.ReactElement | null {
       {actions}
       {moreActionsButton}
     </div>
-  );
-}
-
-function StackEditButton({info}: {info: DagCommitInfo}): React.ReactElement | null {
-  const uncommitted = useAtomValue(latestUncommittedChangesData);
-  const dag = useAtomValue(dagWithPreviews);
-  const [[, stackHashes], setStackIntentionHashes] = useAtom(editingStackIntentionHashes);
-  const loadingState = useAtomValue(loadingStackState);
-  const confirmUnsavedEditsBeforeSplit = useConfirmUnsavedEditsBeforeSplit();
-
-  const set = dag.nonObsolete(dag.descendants(info.hash));
-  if (set.size <= 1) {
-    return null;
-  }
-
-  const stackCommits = dag.getBatch(set.toArray());
-  const isEditing = stackHashes.size > 0 && set.toSeq().some(h => stackHashes.has(h));
-
-  const isPreview = info.previewType != null;
-  const isLoading = isEditing && loadingState.state === 'loading';
-  const isError = isEditing && loadingState.state === 'hasError';
-  const isLinear =
-    dag.merge(set).size === 0 && dag.heads(set).size === 1 && dag.roots(set).size === 1;
-  const isDirty = stackCommits.some(c => c.isDot) && uncommitted.files.length > 0;
-  const hasPublic = stackCommits.some(c => c.phase === 'public');
-  const disabled = isDirty || !isLinear || isLoading || isError || isPreview || hasPublic;
-  const title = isError
-    ? t(`Failed to load stack: ${loadingState.error}`)
-    : isLoading
-      ? loadingState.exportedStack === undefined
-        ? t('Reading stack content')
-        : t('Analyzing stack content')
-      : isDirty
-        ? t(
-            'Cannot edit stack when there are uncommitted changes.\nCommit or amend your changes first.',
-          )
-        : isPreview
-          ? t('Cannot edit pending changes')
-          : hasPublic
-            ? t('Cannot edit public commits')
-            : isLinear
-              ? t('Reorder, fold, or drop commits')
-              : t('Cannot edit non-linear stack');
-  const highlight = disabled ? [] : stackCommits;
-  const tooltipDelay = disabled && !isLoading ? undefined : DOCUMENTATION_DELAY;
-  const icon = isLoading ? <Icon icon="loading" slot="start" /> : <StackEditIcon slot="start" />;
-
-  return (
-    <HighlightCommitsWhileHovering key="submit-stack" toHighlight={highlight}>
-      <Tooltip title={title} delayMs={tooltipDelay} placement="bottom">
-        <Button
-          className={`edit-stack-button${disabled ? ' disabled' : ''}`}
-          disabled={disabled}
-          icon
-          onClick={async () => {
-            if (!(await confirmUnsavedEditsBeforeSplit(stackCommits, 'edit_stack'))) {
-              return;
-            }
-            setStackIntentionHashes(['general', new Set<Hash>(set)]);
-          }}>
-          {icon}
-          <T>Edit stack</T>
-        </Button>
-      </Tooltip>
-    </HighlightCommitsWhileHovering>
   );
 }
 

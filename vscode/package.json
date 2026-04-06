@@ -1,9 +1,9 @@
 {
-  "name": "sapling-scm",
-  "displayName": "Sapling SCM",
-  "description": "Sapling: A Scalable, User-Friendly Source Control System",
-  "version": "0.1.70",
-  "publisher": "meta",
+  "name": "champagne-scm",
+  "displayName": "Champagne SCM",
+  "description": "A universal, graphical source control interface for Git, Sapling, Graphite, and more",
+  "version": "0.1.1",
+  "publisher": "jesselupica",
   "license": "MIT",
   "engines": {
     "vscode": "^1.63.0"
@@ -21,22 +21,22 @@
     "workspace"
   ],
   "galleryBanner": {
-    "color": "#2e8555",
-    "theme": "dark"
+    "color": "#f5efe6",
+    "theme": "light"
   },
   "main": "./dist/extension.js",
   "icon": "resources/extensionIcon.png",
-  "homepage": "https://sapling-scm.com/",
+  "homepage": "https://github.com/jesselupica/champagne",
   "bugs": {
-    "url": "https://github.com/facebook/sapling/issues"
+    "url": "https://github.com/jesselupica/champagne/issues"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/facebook/sapling"
+    "url": "https://github.com/jesselupica/champagne"
   },
   "contributes": {
     "configuration": {
-      "title": "Sapling",
+      "title": "Champagne",
       "properties": {
         "sapling.commandPath": {
           "type": "string",
@@ -101,7 +101,7 @@
       "activitybar": [
         {
           "id": "sapling",
-          "icon": "resources/Sapling_viewContainer.svg",
+          "icon": "resources/champagne-viewContainer.svg",
           "title": "%sapling.command-category%"
         }
       ]
@@ -135,7 +135,7 @@
         "command": "sapling.open-isl",
         "title": "%sapling.open-isl-command%",
         "category": "%sapling.command-category%",
-        "icon": "resources/Sapling_favicon-light-green-transparent.svg"
+        "icon": "resources/champagne-favicon-light-green-transparent.svg"
       },
       {
         "command": "sapling.open-file-diff-uncommitted",
@@ -175,7 +175,7 @@
       },
       {
         "command": "sapling.isl.focus",
-        "title": "Focus Sapling ISL Sidebar"
+        "title": "Focus Champagne Sidebar"
       },
       {
         "command": "sapling.open-remote-file-link",

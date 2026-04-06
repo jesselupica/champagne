@@ -179,7 +179,7 @@ function ISLNullState({repoError}: {repoError: RepositoryError}) {
               </div>
               <p>
                 <T replace={{$cwd: <code>{repoError.cwd}</code>}}>
-                  $cwd is not a valid Sapling repository. Clone or init a repository to use ISL.
+                  $cwd is not a valid repository. Clone or init a repository to use Champagne.
                 </T>
               </p>
             </EmptyState>
@@ -252,7 +252,7 @@ function ISLNullState({repoError}: {repoError: RepositoryError}) {
         content = (
           <ErrorNotice
             startExpanded
-            title={<T>Invalid Sapling command. Is Sapling installed correctly?</T>}
+            title={<T>Invalid VCS command. Is your version control system installed correctly?</T>}
             description={
               <T replace={{$cmd: repoError.command}}>Command "$cmd" was not found in PATH</T>
             }

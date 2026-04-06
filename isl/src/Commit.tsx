@@ -568,7 +568,14 @@ export const Commit = memo(
               </span>
             )}
             <UnsavedEditedMessageIndicator commit={commit} />
-            {!isPublic && <BranchingPrs bookmarks={commit.remoteBookmarks} />}
+            {!isPublic && (
+              <BranchingPrs
+                bookmarks={commit.remoteBookmarks.filter(rb => {
+                  const shortName = rb.replace(/^[^/]+\//, '');
+                  return !commit.bookmarks.includes(shortName);
+                })}
+              />
+            )}
             <AllBookmarksTruncated
               local={commit.bookmarks}
               remote={

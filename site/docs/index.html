@@ -8,34 +8,157 @@
   <link rel="icon" href="../assets/logo.png" type="image/png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            bg: '#0a0806',
+            surface: '#1a1510',
+            accent: '#b28f61',
+            cream: '#faf4eb',
+            muted: '#302a23',
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+        },
+      },
+    }
+  </script>
   <link rel="stylesheet" href="../css/styles.css">
 </head>
-<body>
-  <nav class="nav">
-    <a href="../" class="nav-brand">
-      <img src="../assets/logo.png" alt="Champagne logo">
-      Champagne
-    </a>
-    <ul class="nav-links">
-      <li><a href="./">Docs</a></li>
-      <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener">GitHub</a></li>
-      <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener">VS Code Marketplace</a></li>
-    </ul>
+<body class="bg-bg font-sans">
+
+  <!-- Nav -->
+  <nav class="sticky top-0 z-50 bg-bg/90 backdrop-blur-md border-b border-muted/50">
+    <div class="max-w-6xl mx-auto flex items-center justify-between h-16 px-6">
+      <a href="../" class="flex items-center gap-3 text-cream font-semibold text-lg hover:opacity-80 transition-opacity">
+        <div class="nav-logo-wrap"><img src="../assets/glass-favicon.png" alt="Champagne logo"></div>
+        Champagne
+      </a>
+      <ul class="flex items-center gap-8">
+        <li><a href="./" class="text-sm text-accent font-medium">Docs</a></li>
+        <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener" class="text-sm text-cream/70 hover:text-accent transition-colors font-medium">GitHub</a></li>
+        <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener" class="text-sm text-cream/70 hover:text-accent transition-colors font-medium">VS Code Marketplace</a></li>
+      </ul>
+    </div>
   </nav>
 
-  <main class="docs-content">
-    <h1>Documentation</h1>
-    <p>Documentation for Champagne is coming soon. In the meantime, check out the <a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener">GitHub repository</a> for setup instructions and source code.</p>
-  </main>
+  <!-- Docs Layout -->
+  <div class="max-w-6xl mx-auto flex min-h-[calc(100vh-4rem)]">
 
-  <footer class="footer">
-    <ul class="footer-links">
-      <li><a href="./">Docs</a></li>
-      <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener">GitHub</a></li>
-      <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener">VS Code Marketplace</a></li>
+    <!-- Sidebar -->
+    <aside class="hidden md:block w-64 shrink-0 border-r border-muted/50 py-8 pr-6 pl-6">
+      <nav class="sticky top-24 space-y-6">
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-cream/30 mb-3">Getting Started</h4>
+          <ul class="space-y-1">
+            <li><a href="./" class="block text-sm text-accent font-medium py-1.5 px-3 rounded-md bg-accent/10">Introduction</a></li>
+            <li><a href="#" class="block text-sm text-cream/50 hover:text-cream hover:bg-surface py-1.5 px-3 rounded-md transition-colors">Installation</a></li>
+            <li><a href="#" class="block text-sm text-cream/50 hover:text-cream hover:bg-surface py-1.5 px-3 rounded-md transition-colors">Quick Start</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-cream/30 mb-3">Guides</h4>
+          <ul class="space-y-1">
+            <li><a href="#" class="block text-sm text-cream/50 hover:text-cream hover:bg-surface py-1.5 px-3 rounded-md transition-colors">Git Setup</a></li>
+            <li><a href="#" class="block text-sm text-cream/50 hover:text-cream hover:bg-surface py-1.5 px-3 rounded-md transition-colors">Sapling Setup</a></li>
+            <li><a href="#" class="block text-sm text-cream/50 hover:text-cream hover:bg-surface py-1.5 px-3 rounded-md transition-colors">VS Code Extension</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 class="text-xs font-semibold uppercase tracking-wider text-cream/30 mb-3">Reference</h4>
+          <ul class="space-y-1">
+            <li><a href="#" class="block text-sm text-cream/50 hover:text-cream hover:bg-surface py-1.5 px-3 rounded-md transition-colors">Configuration</a></li>
+            <li><a href="#" class="block text-sm text-cream/50 hover:text-cream hover:bg-surface py-1.5 px-3 rounded-md transition-colors">Keyboard Shortcuts</a></li>
+            <li><a href="#" class="block text-sm text-cream/50 hover:text-cream hover:bg-surface py-1.5 px-3 rounded-md transition-colors">Troubleshooting</a></li>
+          </ul>
+        </div>
+      </nav>
+    </aside>
+
+    <!-- Content -->
+    <main class="flex-1 py-8 px-8 md:px-12 max-w-3xl">
+      <!-- Breadcrumb -->
+      <div class="flex items-center gap-2 text-sm text-cream/30 mb-8">
+        <a href="./" class="hover:text-cream transition-colors">Docs</a>
+        <span>/</span>
+        <span class="text-cream/50">Introduction</span>
+      </div>
+
+      <!-- Article -->
+      <article class="prose-custom">
+        <h1 class="text-3xl font-bold text-cream mb-4">Introduction</h1>
+        <p class="text-cream/60 text-lg leading-relaxed mb-8">
+          Champagne is a beautiful, streamlined source control UI that works with Git, Sapling, Graphite, and more.
+        </p>
+
+        <div class="bg-surface border border-muted rounded-lg p-6 mb-8">
+          <p class="text-cream/50 text-sm leading-relaxed">
+            Documentation is actively being written. In the meantime, check out the
+            <a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener" class="text-accent hover:underline">GitHub repository</a>
+            for setup instructions and source code.
+          </p>
+        </div>
+
+        <h2 class="text-xl font-semibold text-cream mt-10 mb-4">What is Champagne?</h2>
+        <p class="text-cream/50 leading-relaxed mb-4">
+          Champagne provides a graphical interface for version control, built for an opinionated, agent-first development cycle. It supports multiple VCS backends through a pluggable driver architecture.
+        </p>
+
+        <h2 class="text-xl font-semibold text-cream mt-10 mb-4">Supported Backends</h2>
+        <ul class="space-y-2 mb-8">
+          <li class="flex items-center gap-3 text-cream/50">
+            <span class="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></span>
+            <span><strong class="text-cream/70">Git</strong> — raw git commands</span>
+          </li>
+          <li class="flex items-center gap-3 text-cream/50">
+            <span class="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></span>
+            <span><strong class="text-cream/70">Sapling</strong> — reference implementation</span>
+          </li>
+          <li class="flex items-center gap-3 text-cream/50">
+            <span class="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></span>
+            <span><strong class="text-cream/70">Graphite</strong> — Git wrapper for stacked PRs</span>
+          </li>
+          <li class="flex items-center gap-3 text-cream/50">
+            <span class="w-1.5 h-1.5 rounded-full bg-accent shrink-0"></span>
+            <span><strong class="text-cream/70">Git Branchless</strong> — Git extension</span>
+          </li>
+        </ul>
+
+        <h2 class="text-xl font-semibold text-cream mt-10 mb-4">Quick Install</h2>
+        <p class="text-cream/50 leading-relaxed mb-4">
+          Install the VS Code extension from the marketplace:
+        </p>
+        <div class="bg-surface border border-muted rounded-lg p-4 mb-8 font-mono text-sm">
+          <span class="text-cream/30 select-none">$ </span><span class="text-accent">ext install jesselupica.champagne-scm</span>
+        </div>
+      </article>
+
+      <!-- Prev/Next -->
+      <div class="flex justify-between items-center mt-16 pt-8 border-t border-muted/50">
+        <div></div>
+        <a href="#" class="group flex items-center gap-2 text-sm text-cream/50 hover:text-accent transition-colors">
+          Installation
+          <svg class="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+        </a>
+      </div>
+    </main>
+
+  </div>
+
+  <!-- Footer -->
+  <footer class="border-t border-muted/50 py-12 text-center">
+    <ul class="flex justify-center gap-8 mb-6">
+      <li><a href="./" class="text-sm text-cream/50 hover:text-accent transition-colors">Docs</a></li>
+      <li><a href="https://github.com/jesselupica/champagne" target="_blank" rel="noopener" class="text-sm text-cream/50 hover:text-accent transition-colors">GitHub</a></li>
+      <li><a href="https://marketplace.visualstudio.com/items?itemName=jesselupica.champagne-scm" target="_blank" rel="noopener" class="text-sm text-cream/50 hover:text-accent transition-colors">VS Code Marketplace</a></li>
     </ul>
-    <p class="footer-license">MIT License</p>
+    <p class="text-xs text-cream/25">MIT License</p>
   </footer>
+
 </body>
 </html>

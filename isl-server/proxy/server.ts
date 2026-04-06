@@ -78,6 +78,7 @@ export function startServer({
 
     // Anything not part of the asset-manifest we need to explicitly serve
     requestUrlToResource[`/favicon.ico`] = 'favicon.ico';
+    requestUrlToResource[`/favicon.png`] = 'favicon.png';
 
     /**
      * Event listener for HTTP server "error" event.
