@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.1.4
+
+### Apr 5 2026
+
+- Fix large repo support: repos with many commits no longer crash with "No commits found"
+- Detect default branch dynamically instead of hardcoding main/master
+- Add time-based filtering with `--since` for git log, avoiding fetching entire history
+- Cap git log at 10k commits and git rev-list at 50k hashes as safety limits
+- Branch tips are always fetched regardless of date filter, so branches always appear in the UI
+- "Load more commits" button works correctly: 14 days → 60 days → all (capped)
+
 ## 0.1.70
 
 - Reduced fetching frequency for better performance

@@ -116,6 +116,7 @@ cd shared && yarn add <package>       # Shared
 ## Important Rules
 
 - **Never run the Champagne app (server/dev) against the champagne repo itself.** Use `scripts/test-git-repo.sh` to create a separate test repo for testing the UI.
+- **Always update the VSIX changelog** (`vscode/CHANGELOG.md`) when bumping the extension version. Add a new entry at the top with the version number, date, and a summary of changes.
 
 ## Troubleshooting
 
