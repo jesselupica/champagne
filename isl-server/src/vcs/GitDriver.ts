@@ -213,6 +213,8 @@ export class GitDriver implements VCSDriver {
     const localBranches = new Map<string, string>(); // hash -> branch names (NUL-separated)
     const remoteBranches = new Map<string, string[]>(); // hash -> remote branch names
     try {
+      // TODO(audit): --count=2000 silently drops branches in repos with >2000 local branches.
+      // Tradeoff: raise cap vs add warning when truncated vs remove cap (200 bytes/ref is cheap).
       const refsResult = await this.runCommand(ctx, [
         'for-each-ref',
         '--count=2000',
@@ -271,6 +273,8 @@ export class GitDriver implements VCSDriver {
       '--glob=refs/heads/',
       '--glob=refs/remotes/origin/',
       '--format=' + format,
+      // TODO(audit): --topo-order requires full DAG traversal before first output, slow on wide histories.
+      // Alternative: --date-order is incremental but changes graph display ordering.
       '--topo-order',
       '--max-count=' + MAX_LOG_COMMITS,
     ];
@@ -297,6 +301,7 @@ export class GitDriver implements VCSDriver {
     // Fetch them separately so branches always appear in the UI regardless of age.
     if (draftDateCutoff != null) {
       try {
+        // TODO(audit): With 2000+ branches, this command can hit OS ARG_MAX (~2MB). Batch like lookupCommits.
         const branchTipArgs = [
           'log',
           '--format=' + format,
@@ -454,6 +459,8 @@ export class GitDriver implements VCSDriver {
       }
     }
 
+    // TODO(audit): Repos with >50k trunk commits misclassify old public commits as "draft".
+    // The Set also uses significant RAM. Consider classifying only fetched commits via --stdin.
     const MAX_PUBLIC_HASHES = 50_000;
     let trunkHead: string | null = null;
     for (const trunkBranch of trunkCandidates) {
@@ -538,6 +545,8 @@ export class GitDriver implements VCSDriver {
     return commits;
   }
 
+  // TODO(audit): git status rename detection is O(n²) on changed files. Adding --no-renames
+  // improves perf but loses "renamed" info. Tradeoff depends on typical changeset size.
   async fetchStatus(ctx: RepositoryContext): Promise<ChangedFile[]> {
     const result = await this.runCommand(ctx, [
       'status',
@@ -853,6 +862,8 @@ export class GitDriver implements VCSDriver {
     return lines;
   }
 
+  // TODO(audit): No size limit on diff output — a large generated file is fully buffered.
+  // Consider capping at ~1MB with a "diff too large" fallback.
   async getDiff(
     ctx: RepositoryContext,
     comparison: Comparison,
@@ -1860,6 +1871,8 @@ export class GitDriver implements VCSDriver {
     return {args: ['__shell__', script], stdin};
   }
 
+  // TODO(audit): The operation queue is per-Repository instance (in-memory). Two WebSocket
+  // clients can issue concurrent git writes. Needs file-based locking or single-server enforcement.
   getExecParams(
     args_: string[],
     cwd: string,
@@ -1900,6 +1913,8 @@ export class GitDriver implements VCSDriver {
     };
 
     // Handle shell commands (used by hide translation)
+    // TODO(audit): Shell scripts invoke bare `git` without --no-optional-locks, causing
+    // potential lock contention with background operations on busy repos.
     if (args[0] === '__shell__') {
       return {command: 'sh', args: ['-c', args[1]], options};
     }
@@ -1982,6 +1997,8 @@ export class GitDriver implements VCSDriver {
       case ComparisonType.HeadChanges:
         return ['HEAD^', 'HEAD'];
       case ComparisonType.StackChanges:
+        // TODO(audit): StackChanges should diff from merge-base(HEAD, trunk) to HEAD to show
+        // all draft changes. Requires async merge-base lookup; this method is sync.
         return ['HEAD'];
       case ComparisonType.Committed:
         return [comparison.hash + '^', comparison.hash];
