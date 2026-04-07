@@ -205,7 +205,9 @@ export class WatchForChanges {
           fields: ['name'],
           expression: [
             'name',
-            ['bookmarks.current', 'bookmarks', 'dirstate', 'merge'],
+            this.repoInfo.command === 'git'
+              ? ['HEAD', 'index', 'MERGE_HEAD', 'REBASE_HEAD', 'CHERRY_PICK_HEAD']
+              : ['bookmarks.current', 'bookmarks', 'dirstate', 'merge'],
             'wholename',
           ],
           defer: [WatchForChanges.WATCHMAN_DEFER],
@@ -213,11 +215,20 @@ export class WatchForChanges {
         },
       );
       dirstateSubscription.emitter.on('change', changes => {
-        if (changes.includes('merge')) {
-          this.changeCallback('merge conflicts');
-        }
-        if (changes.includes('dirstate')) {
-          handleRepositoryStateChange();
+        if (this.repoInfo.command === 'git') {
+          if (changes.includes('MERGE_HEAD') || changes.includes('REBASE_HEAD') || changes.includes('CHERRY_PICK_HEAD')) {
+            this.changeCallback('merge conflicts');
+          }
+          if (changes.includes('HEAD') || changes.includes('index')) {
+            handleRepositoryStateChange();
+          }
+        } else {
+          if (changes.includes('merge')) {
+            this.changeCallback('merge conflicts');
+          }
+          if (changes.includes('dirstate')) {
+            handleRepositoryStateChange();
+          }
         }
       });
       dirstateSubscription.emitter.on('fresh-instance', handleRepositoryStateChange);
