@@ -96,6 +96,13 @@ export interface EjecaOptions {
    * @default false
    */
   readonly ipc?: boolean;
+
+  /**
+   * Maximum number of bytes allowed on stdout/stderr.
+   * If exceeded, get-stream throws a MaxBufferError.
+   * @default 50_000_000 (50 MB)
+   */
+  readonly maxBuffer?: number;
 }
 
 interface KillOptions {
@@ -251,7 +258,8 @@ function getSpawnedPromise(
     }
   });
 
-  return Promise.all([spawnedPromise, getStreamPromise(stdout), getStreamPromise(stderr)]).then(
+  const maxBuf = options?.maxBuffer;
+  return Promise.all([spawnedPromise, getStreamPromise(stdout, maxBuf), getStreamPromise(stderr, maxBuf)]).then(
     values => {
       const [{exitCode, signal}, stdout, stderr] = values;
       const stripfinalNl = options?.stripFinalNewline ?? true;
@@ -299,9 +307,11 @@ export class EjecaError extends Error implements EjecaReturn {
   }
 }
 
-function getStreamPromise(origStream: Stream | null): Promise<string> {
+const DEFAULT_MAX_BUFFER = 50_000_000; // 50 MB
+
+function getStreamPromise(origStream: Stream | null, maxBuffer?: number): Promise<string> {
   const stream = origStream ?? new Readable({read() {}});
-  return getStream(stream, {encoding: 'utf8'});
+  return getStream(stream, {encoding: 'utf8', maxBuffer: maxBuffer ?? DEFAULT_MAX_BUFFER});
 }
 
 function commonToSpawnOptions(options?: EjecaOptions): SpawnOptions {
