@@ -898,6 +898,24 @@ export class Repository {
         commits: {value: commits},
       };
       this.smartlogCommitsChangesEmitter.emit('change', this.smartlogCommits);
+
+      // Populate file info for draft commits in the background, then re-emit.
+      // This avoids blocking the initial render on potentially slow diff-tree calls.
+      if (this.driver.populateCommitFileInfo) {
+        this.driver.populateCommitFileInfo(this.initialConnectionContext, commits).then(
+          () => {
+            this.smartlogCommits = {
+              fetchStartTimestamp,
+              fetchCompletedTimestamp: Date.now(),
+              commits: {value: commits},
+            };
+            this.smartlogCommitsChangesEmitter.emit('change', this.smartlogCommits);
+          },
+          () => {
+            // Ignore errors — commits already displayed without file info
+          },
+        );
+      }
     } catch (err) {
       let error = err;
       const internalError = Internal.checkInternalError?.(err);

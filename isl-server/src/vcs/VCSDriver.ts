@@ -107,6 +107,13 @@ export interface VCSDriver {
    * Fetch the working directory status (uncommitted changes).
    * Returns all modified, added, removed, unknown, and missing files.
    */
+  /**
+   * Populate filePathsSample and totalFileCount on draft commits.
+   * Called asynchronously after initial commit fetch to avoid blocking the UI.
+   * Mutates the commits array in place; returns the same array.
+   */
+  populateCommitFileInfo?(ctx: RepositoryContext, commits: CommitInfo[]): Promise<CommitInfo[]>;
+
   fetchStatus(ctx: RepositoryContext): Promise<ChangedFile[]>;
 
   /**
