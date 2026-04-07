@@ -1573,9 +1573,17 @@ export class GitDriver implements VCSDriver {
           const script = [
             'set -e',
             `FILE="${escapedFile}"`,
+            // Check if the file is LFS-tracked by inspecting the "ours" stage for a pointer header.
+            // If so, skip the three-way merge (which would corrupt the pointer) and just keep ours.
+            'OURS_CONTENT=$(git show :2:"$FILE")',
+            'if echo "$OURS_CONTENT" | head -1 | grep -q "^version https://git-lfs"; then',
+            '  echo "$OURS_CONTENT" > "$FILE"',
+            '  git add "$FILE"',
+            '  exit 0',
+            'fi',
             'TMPBASE=$(mktemp -t git-isl-union)',
             'trap \'rm -f "$TMPBASE-ours" "$TMPBASE-base" "$TMPBASE-theirs"\' EXIT',
-            'git show :2:"$FILE" > "$TMPBASE-ours"',
+            'echo "$OURS_CONTENT" > "$TMPBASE-ours"',
             'git show :1:"$FILE" > "$TMPBASE-base"',
             'git show :3:"$FILE" > "$TMPBASE-theirs"',
             'git merge-file --union "$TMPBASE-ours" "$TMPBASE-base" "$TMPBASE-theirs" || true',
