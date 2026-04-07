@@ -1258,7 +1258,7 @@ export class GitDriver implements VCSDriver {
       const script = [
         'set -e',
         // Count tracked changed files (exclude untracked ??); -gt 0 means stash needed
-        'HAS_CHANGES=$(git status --porcelain | grep -v "^??" | wc -l | tr -d " ")',
+        'HAS_CHANGES=$(git --no-optional-locks status --porcelain | grep -v "^??" | wc -l | tr -d " ")',
         `if [ "$HAS_CHANGES" -gt 0 ]; then`,
         `  git stash push`,
         `  git checkout "${hash}"`,
@@ -1710,6 +1710,7 @@ export class GitDriver implements VCSDriver {
       ...options_?.env,
       ...env,
       GIT_TERMINAL_PROMPT: '0',
+      GIT_LFS_SKIP_SMUDGE: '1',
       EDITOR: undefined,
       VISUAL: undefined,
     } as unknown as NodeJS.ProcessEnv;
@@ -1731,7 +1732,7 @@ export class GitDriver implements VCSDriver {
       return {command: 'sh', args: ['-c', args[1]], options};
     }
 
-    return {command: this.command, args, options};
+    return {command: this.command, args: ['--no-optional-locks', ...args], options};
   }
 
   async getMergeTool(ctx: RepositoryContext): Promise<string | null> {
