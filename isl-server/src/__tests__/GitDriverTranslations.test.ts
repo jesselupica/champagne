@@ -176,6 +176,15 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(result.args[1]).toContain('git rebase --update-refs --onto "$DEST" "$SRC"^ "$TIP"');
     });
 
+    it('rejects non-SHA values in standard rebase -s/-d', () => {
+      expect(() => translate(['rebase', '-s', '$(rm -rf /)', '-d', 'def456'])).toThrow();
+      expect(() => translate(['rebase', '-s', 'abc123', '-d', '$(rm -rf /)'])).toThrow();
+    });
+
+    it('accepts valid ref-like values in standard rebase', () => {
+      expect(() => translate(['rebase', '-s', 'abc123', '-d', 'HEAD~3'])).not.toThrow();
+    });
+
   });
 
   describe('rebase --keep with --dest (RebaseKeepOperation)', () => {
@@ -524,6 +533,17 @@ describe('GitDriver.normalizeOperationArgs', () => {
       // Verify HEAD-movement logic is present
       expect(result.args[1]).toContain('checkout --detach');
       expect(result.args[1]).toContain('symbolic-ref');
+    });
+
+    it('rejects non-SHA values that could be shell-injected in hide', () => {
+      expect(() => translate(['hide', '--rev', '$(rm -rf /)'])).toThrow();
+      expect(() => translate(['hide', '--rev', 'abc; rm -rf /'])).toThrow();
+      expect(() => translate(['hide', '--rev', '`whoami`'])).toThrow();
+    });
+
+    it('accepts valid 40-char hex SHA in hide', () => {
+      const validSha = 'a'.repeat(40);
+      expect(() => translate(['hide', '--rev', validSha])).not.toThrow();
     });
   });
 

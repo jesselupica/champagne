@@ -1497,6 +1497,14 @@ export class GitDriver implements VCSDriver {
       }
       if (!src || !dest) throw new Error('rebase requires -s and -d');
 
+      // Validate values that will be embedded in shell scripts to prevent injection.
+      // dest is always interpolated into the shell script, so always validate it.
+      GitDriver.assertSafeShellValue(dest, 'rebase -d');
+      // draft() sources are Sapling revsets handled specially below, not interpolated directly.
+      if (!src.startsWith('draft()')) {
+        GitDriver.assertSafeShellValue(src, 'rebase -s');
+      }
+
       // RebaseAllDraftCommitsOperation: src is a Sapling revset like draft() or draft()&date(-N)
       // Note: draft()&date(-N) is accepted but the date filter is intentionally not applied —
       // git has no revset equivalent. We rebase all local (draft) commits regardless of age.
@@ -1761,6 +1769,17 @@ export class GitDriver implements VCSDriver {
   }
 
   /**
+   * Validate that a value is safe to embed in a shell script via double-quoted interpolation.
+   * Accepts 40-char hex SHAs and simple ref-like strings (alphanumeric, -, _, /, ., ~, ^).
+   * Rejects anything with shell metacharacters ($, backtick, ;, |, &, parens, braces, etc.).
+   */
+  private static assertSafeShellValue(value: string, context: string): void {
+    if (!/^[0-9a-fA-F]{4,40}$/.test(value) && !/^[a-zA-Z0-9_\-./~^]+$/.test(value)) {
+      throw new Error(`Unsafe value for shell interpolation in ${context}: ${value}`);
+    }
+  }
+
+  /**
    * Translate `hide --rev HASH` to git commands that make the commit unreachable.
    *
    * Finds all local branches that contain the hash anywhere in their history
@@ -1772,6 +1791,7 @@ export class GitDriver implements VCSDriver {
     if (revIdx === -1) throw new Error('hide requires --rev <hash>');
     const hash = args[revIdx + 1];
     if (!hash) throw new Error('hide --rev requires a hash value');
+    GitDriver.assertSafeShellValue(hash, 'hide --rev');
 
     const script = [
       // Collect the list of branches to delete (contains the hidden commit anywhere in history)
