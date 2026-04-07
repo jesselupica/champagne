@@ -172,7 +172,7 @@ describe('GitDriver.normalizeOperationArgs', () => {
       // Script should find descendants of SRC and rebase the whole stack onto DEST
       expect(result.args[1]).toContain('SRC="abc123"');
       expect(result.args[1]).toContain('DEST="def456"');
-      expect(result.args[1]).toContain('git branch --contains "$SRC"');
+      expect(result.args[1]).toContain('git for-each-ref --contains "$SRC"');
       expect(result.args[1]).toContain('git rebase --update-refs --onto "$DEST" "$SRC"^ "$TIP"');
     });
 
@@ -601,27 +601,32 @@ describe('GitDriver.normalizeOperationArgs', () => {
 describe('GitDriver.getExecParams', () => {
   it('strips --verbose prepended by Repository.runOperation', () => {
     const {args} = driver.getExecParams(['--verbose', 'checkout', 'abc123'], '/repo');
-    expect(args).toEqual(['checkout', 'abc123']);
+    expect(args).toEqual(['--no-optional-locks', 'checkout', 'abc123']);
   });
 
   it('strips --debug prepended by Repository.runOperation', () => {
     const {args} = driver.getExecParams(['--debug', 'commit', '--message', 'hi'], '/repo');
-    expect(args).toEqual(['commit', '--message', 'hi']);
+    expect(args).toEqual(['--no-optional-locks', 'commit', '--message', 'hi']);
   });
 
   it('strips both --verbose and --debug when both are prepended', () => {
     const {args} = driver.getExecParams(['--verbose', '--debug', 'rebase', '--onto', 'main', 'abc^', 'abc'], '/repo');
-    expect(args).toEqual(['rebase', '--onto', 'main', 'abc^', 'abc']);
+    expect(args).toEqual(['--no-optional-locks', 'rebase', '--onto', 'main', 'abc^', 'abc']);
   });
 
   it('preserves normal git args unchanged', () => {
     const {args} = driver.getExecParams(['commit', '--verbose', '--message', 'hi'], '/repo');
-    expect(args).toEqual(['commit', '--verbose', '--message', 'hi']);
+    expect(args).toEqual(['--no-optional-locks', 'commit', '--verbose', '--message', 'hi']);
   });
 
   it('handles __shell__ after stripping --verbose', () => {
     const {command, args} = driver.getExecParams(['--verbose', '__shell__', 'rm -f "file.txt"'], '/repo');
     expect(command).toBe('sh');
     expect(args).toEqual(['-c', 'rm -f "file.txt"']);
+  });
+
+  it('sets GIT_LFS_SKIP_SMUDGE in environment', () => {
+    const {options} = driver.getExecParams(['status'], '/repo');
+    expect(options.env?.GIT_LFS_SKIP_SMUDGE).toBe('1');
   });
 });
