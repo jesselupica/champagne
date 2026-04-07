@@ -422,6 +422,17 @@ export class GitDriver implements VCSDriver {
 
     const publicHashes = new Set<string>();
 
+    // Detect shallow clones — rev-list results are truncated at the graft boundary.
+    // In a shallow clone, we use --first-parent to reduce traversal cost since the
+    // full history isn't available anyway.
+    let isShallow = false;
+    try {
+      const shallowResult = await this.runCommand(ctx, ['rev-parse', '--is-shallow-repository']);
+      isShallow = shallowResult.stdout.trim() === 'true';
+    } catch {
+      // Old git versions don't support --is-shallow-repository
+    }
+
     // Detect the default branch dynamically
     const trunkCandidates: string[] = [];
     try {
@@ -448,11 +459,14 @@ export class GitDriver implements VCSDriver {
     for (const trunkBranch of trunkCandidates) {
       for (const ref of [`origin/${trunkBranch}`, trunkBranch]) {
         try {
-          const trunkResult = await this.runCommand(ctx, [
+          const revListArgs = [
             'rev-list',
             '--max-count=' + MAX_PUBLIC_HASHES,
+            // In shallow clones, use --first-parent to reduce traversal cost
+            ...(isShallow ? ['--first-parent'] : []),
             ref,
-          ]);
+          ];
+          const trunkResult = await this.runCommand(ctx, revListArgs);
           for (const line of trunkResult.stdout.trim().split('\n')) {
             if (line) {
               publicHashes.add(line);
