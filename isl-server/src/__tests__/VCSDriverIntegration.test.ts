@@ -1346,6 +1346,88 @@ if (hasGit) {
         expect(Array.isArray(status)).toBe(true);
       });
     });
+
+    describe('Edge Cases', () => {
+      it('fetchStatus handles filenames with spaces', async () => {
+        await gitHelpers.commit(tmpDir, 'initial', 'normal.txt', 'content');
+        await fs.writeFile(path.join(tmpDir, 'file with spaces.txt'), 'spaced content');
+        const ctx = {cmd: 'git' as const, cwd: tmpDir, logger: mockLogger, tracker: mockTracker};
+        const status = await driver.fetchStatus(ctx);
+        const spaced = status.find(f => f.path === 'file with spaces.txt');
+        expect(spaced).toBeDefined();
+        expect(spaced!.status).toBe('?');
+      });
+
+      it('fetchStatus handles unicode filenames', async () => {
+        await gitHelpers.commit(tmpDir, 'initial', 'normal.txt', 'content');
+        await fs.writeFile(path.join(tmpDir, 'données.txt'), 'unicode content');
+        const ctx = {cmd: 'git' as const, cwd: tmpDir, logger: mockLogger, tracker: mockTracker};
+        const status = await driver.fetchStatus(ctx);
+        const unicode = status.find(f => f.path.includes('donn'));
+        expect(unicode).toBeDefined();
+      });
+
+      it('fetchCommits returns empty array for empty repo (no commits)', async () => {
+        const emptyDir = await fs.realpath(
+          await fs.mkdtemp(path.join(os.tmpdir(), 'champagne-empty-')),
+        );
+        try {
+          await execFile('git', ['init'], {cwd: emptyDir});
+          const ctx = {
+            cmd: 'git' as const,
+            cwd: emptyDir,
+            logger: mockLogger,
+            tracker: mockTracker,
+          };
+          const commits = await driver.fetchCommits(ctx, {type: 'none'}, defaultFetchOptions);
+          expect(commits).toEqual([]);
+        } finally {
+          await fs.rm(emptyDir, {recursive: true, force: true});
+        }
+      });
+
+      it('fetchStatus works in empty repo (no commits)', async () => {
+        const emptyDir = await fs.realpath(
+          await fs.mkdtemp(path.join(os.tmpdir(), 'champagne-empty-')),
+        );
+        try {
+          await execFile('git', ['init'], {cwd: emptyDir});
+          await fs.writeFile(path.join(emptyDir, 'new.txt'), 'new');
+          const ctx = {
+            cmd: 'git' as const,
+            cwd: emptyDir,
+            logger: mockLogger,
+            tracker: mockTracker,
+          };
+          const status = await driver.fetchStatus(ctx);
+          expect(status.find(f => f.path === 'new.txt')).toBeDefined();
+        } finally {
+          await fs.rm(emptyDir, {recursive: true, force: true});
+        }
+      });
+
+      it('getDiffStats returns result (not crash) for root commit', async () => {
+        await gitHelpers.commit(tmpDir, 'root', 'file.txt', 'content');
+        const hash = await gitHelpers.getHead(tmpDir);
+        const ctx = {cmd: 'git' as const, cwd: tmpDir, logger: mockLogger, tracker: mockTracker};
+        const stats = await driver.getDiffStats(ctx, hash, []);
+        expect(stats === undefined || typeof stats === 'number').toBe(true);
+      });
+
+      it('lookupCommits returns all requested commits', async () => {
+        const hashes: string[] = [];
+        for (let i = 0; i < 5; i++) {
+          await gitHelpers.commit(tmpDir, `commit-${i}`, `file-${i}.txt`, `content-${i}`);
+          hashes.push(await gitHelpers.getHead(tmpDir));
+        }
+        const ctx = {cmd: 'git' as const, cwd: tmpDir, logger: mockLogger, tracker: mockTracker};
+        const commits = await driver.lookupCommits(ctx, {type: 'none'}, hashes);
+        expect(commits.length).toBe(5);
+        for (const hash of hashes) {
+          expect(commits.find(c => c.hash === hash)).toBeDefined();
+        }
+      });
+    });
   });
 } else {
   describe('Git Driver Integration Tests', () => {
