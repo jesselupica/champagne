@@ -259,6 +259,8 @@ export class GitDriver implements VCSDriver {
     try {
       const refsResult = await this.runCommand(ctx, [
         'for-each-ref',
+        '--count=2000',
+        '--sort=-committerdate',
         '--format=%(objectname) %(refname)',
         'refs/heads/',
         'refs/remotes/',
@@ -309,10 +311,9 @@ export class GitDriver implements VCSDriver {
     const MAX_LOG_COMMITS = 10_000;
     const logArgs = [
       'log',
-      // Exclude stash refs — stash commits (WIP on ..., index on ...) should never
-      // appear in the commit graph. --exclude must come before --all.
-      '--exclude=refs/stash',
-      '--all',
+      'HEAD',
+      '--glob=refs/heads/',
+      '--glob=refs/remotes/origin/',
       '--format=' + format,
       '--topo-order',
       '--max-count=' + MAX_LOG_COMMITS,
