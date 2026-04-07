@@ -711,15 +711,22 @@ export class GitDriver implements VCSDriver {
       // ignore
     }
 
-    const result = await this.runCommand(ctx, [
-      'log',
-      '--no-walk',
-      '--format=' + format,
-      ...hashes,
-    ]);
+    // Batch hashes to avoid hitting ARG_MAX on systems with many hashes
+    const BATCH_SIZE = 200;
+    let allOutput = '';
+    for (let i = 0; i < hashes.length; i += BATCH_SIZE) {
+      const batch = hashes.slice(i, i + BATCH_SIZE);
+      const result = await this.runCommand(ctx, [
+        'log',
+        '--no-walk',
+        '--format=' + format,
+        ...batch,
+      ]);
+      allOutput += result.stdout;
+    }
 
     const commits: CommitInfo[] = [];
-    for (const record of result.stdout.split(RECORD_SEP)) {
+    for (const record of allOutput.split(RECORD_SEP)) {
       const trimmed = record.trim();
       if (!trimmed) {
         continue;
@@ -1502,10 +1509,9 @@ export class GitDriver implements VCSDriver {
         `SRC="${escapedSrc}"`,
         `DEST="${escapedDest}"`,
         // Find branch tip: look for a local branch whose tip is a strict descendant of SRC.
-        // git branch --contains lists branches that have SRC in their history;
-        // git merge-base --is-ancestor SRC TIP confirms TIP descends from SRC.
+        // Use for-each-ref --contains (plumbing, faster than branch --contains on large repos).
         'TIP=""',
-        'for hash in $(git branch --contains "$SRC" --format="%(objectname)"); do',
+        'for hash in $(git for-each-ref --contains "$SRC" --format="%(objectname)" refs/heads/); do',
         '  if [ "$hash" != "$SRC" ] && git merge-base --is-ancestor "$SRC" "$hash" 2>/dev/null; then',
         '    TIP="$hash"',
         '    break',
@@ -1755,7 +1761,7 @@ export class GitDriver implements VCSDriver {
 
     const script = [
       // Collect the list of branches to delete (contains the hidden commit anywhere in history)
-      `BRANCHES=$(git branch --contains "${hash}" --format='%(refname:short)' 2>/dev/null)`,
+      `BRANCHES=$(git for-each-ref --contains "${hash}" --format='%(refname:short)' refs/heads/ 2>/dev/null)`,
       // Get the current branch name (empty string if in detached HEAD state)
       `CURRENT=$(git symbolic-ref --short HEAD 2>/dev/null || echo '')`,
       // If the current branch is in the delete list, detach HEAD to the parent first
