@@ -1047,7 +1047,17 @@ export class GitDriver implements VCSDriver {
       const result = await this.runCommand(ctx, args);
       return this.parseSlocFrom(result.stdout);
     } catch {
-      return undefined;
+      // Root commit has no parent — fall back to diff-tree --root
+      try {
+        const args = ['diff-tree', '--stat', '--no-renames', '--root', 'HEAD'];
+        if (includeFiles.length > 0) {
+          args.push('--', ...includeFiles);
+        }
+        const result = await this.runCommand(ctx, args);
+        return this.parseSlocFrom(result.stdout);
+      } catch {
+        return undefined;
+      }
     }
   }
 
@@ -1066,9 +1076,14 @@ export class GitDriver implements VCSDriver {
     ctx: RepositoryContext,
     names: ReadonlyArray<T>,
   ): Promise<Map<T, string>> {
+    const results = await Promise.all(
+      names.map(async name => {
+        const value = await this.getConfig(ctx, name);
+        return [name, value] as const;
+      }),
+    );
     const configMap = new Map<T, string>();
-    for (const name of names) {
-      const value = await this.getConfig(ctx, name);
+    for (const [name, value] of results) {
       if (value != null) {
         configMap.set(name, value);
       }
