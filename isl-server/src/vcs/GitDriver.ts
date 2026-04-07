@@ -1098,6 +1098,11 @@ export class GitDriver implements VCSDriver {
       args,
       ctx.cwd,
       options,
+      // Skip LFS smudge for read-only data-fetching commands. This prevents git-lfs
+      // from downloading large files when we only need metadata (status, log, diff, etc.).
+      // Operations that change the working tree are executed via runOperation() in
+      // Repository.ts, which does NOT pass this flag, allowing LFS to work normally.
+      {GIT_LFS_SKIP_SMUDGE: '1'},
     );
     ctx.logger.log('run command: ', ctx.cwd, command, resolvedArgs[0]);
     const result = ejeca(command, resolvedArgs, resolvedOptions);
@@ -1376,8 +1381,10 @@ export class GitDriver implements VCSDriver {
       if (args.includes('--rev')) {
         return this.translatePullRevToGit(args);
       }
-      // Plain pull = fetch only (do not merge into working directory)
-      return {args: ['fetch', '--all'], stdin};
+      // Plain pull = fetch only (do not merge into working directory).
+      // Fetch from 'origin' only, not --all, to match Sapling's default-remote semantics
+      // and avoid fetching unexpected data from other configured remotes.
+      return {args: ['fetch', 'origin'], stdin};
     }
     if (args[0] === 'bookmark') {
       if (args[1] === '--delete') {
@@ -1398,7 +1405,9 @@ export class GitDriver implements VCSDriver {
     }
     if (args[0] === 'shelve') {
       if (args[1] === '--delete') {
-        return {args: ['stash', 'drop'], stdin};
+        // args[2] is the stash ref (e.g. stash@{2}) from ShelvedChange.name
+        const stashRef = args[2];
+        return {args: stashRef ? ['stash', 'drop', stashRef] : ['stash', 'drop'], stdin};
       }
       const out: string[] = ['stash', 'push'];
       let name: string | undefined;
@@ -1414,7 +1423,12 @@ export class GitDriver implements VCSDriver {
     }
     if (args[0] === 'unshelve') {
       const keep = args.includes('--keep');
-      return {args: ['stash', keep ? 'apply' : 'pop'], stdin};
+      // Extract --name to target a specific stash (e.g. stash@{2})
+      const nameIdx = args.indexOf('--name');
+      const stashRef = nameIdx !== -1 ? args[nameIdx + 1] : undefined;
+      const out = ['stash', keep ? 'apply' : 'pop'];
+      if (stashRef) out.push(stashRef);
+      return {args: out, stdin};
     }
     if (args[0] === 'rebase') {
       // --abort: detect which operation is in progress and abort it.
@@ -1792,7 +1806,10 @@ export class GitDriver implements VCSDriver {
       ...options_?.env,
       ...env,
       GIT_TERMINAL_PROMPT: '0',
-      GIT_LFS_SKIP_SMUDGE: '1',
+      // GIT_LFS_SKIP_SMUDGE is intentionally NOT set here — it is only set for
+      // read-only data-fetching commands (via runCommand). Operations that change
+      // the working tree (checkout, stash pop, rebase) must allow LFS smudge filters
+      // to run so that LFS-tracked files are materialized, not left as pointers.
       EDITOR: undefined,
       VISUAL: undefined,
     } as unknown as NodeJS.ProcessEnv;

@@ -316,22 +316,34 @@ describe('GitDriver.normalizeOperationArgs', () => {
       });
     });
 
-    it('translates shelve --delete to stash drop', () => {
-      expect(translate(['shelve', '--delete', 'wip'])).toEqual({
+    it('translates shelve --delete to stash drop with the stash ref', () => {
+      expect(translate(['shelve', '--delete', 'stash@{2}'])).toEqual({
+        args: ['stash', 'drop', 'stash@{2}'],
+      });
+    });
+
+    it('translates shelve --delete without name to plain stash drop', () => {
+      expect(translate(['shelve', '--delete'])).toEqual({
         args: ['stash', 'drop'],
       });
     });
   });
 
   describe('unshelve', () => {
-    it('translates unshelve --keep to stash apply', () => {
-      expect(translate(['unshelve', '--keep', '--name', 'wip'])).toEqual({
-        args: ['stash', 'apply'],
+    it('translates unshelve --keep to stash apply with stash ref', () => {
+      expect(translate(['unshelve', '--keep', '--name', 'stash@{1}'])).toEqual({
+        args: ['stash', 'apply', 'stash@{1}'],
       });
     });
 
-    it('translates unshelve (no --keep) to stash pop', () => {
-      expect(translate(['unshelve', '--name', 'wip'])).toEqual({
+    it('translates unshelve (no --keep) to stash pop with stash ref', () => {
+      expect(translate(['unshelve', '--name', 'stash@{0}'])).toEqual({
+        args: ['stash', 'pop', 'stash@{0}'],
+      });
+    });
+
+    it('translates unshelve without --name to plain stash pop', () => {
+      expect(translate(['unshelve'])).toEqual({
         args: ['stash', 'pop'],
       });
     });
@@ -583,9 +595,9 @@ describe('GitDriver.normalizeOperationArgs', () => {
   });
 
   describe('pull (plain, PullOperation)', () => {
-    it('translates plain pull to fetch --all (not git pull which would merge)', () => {
+    it('translates plain pull to fetch origin (not git pull which would merge)', () => {
       expect(translate(['pull'])).toEqual({
-        args: ['fetch', '--all'],
+        args: ['fetch', 'origin'],
         stdin: undefined,
       });
     });
@@ -625,8 +637,13 @@ describe('GitDriver.getExecParams', () => {
     expect(args).toEqual(['-c', 'rm -f "file.txt"']);
   });
 
-  it('sets GIT_LFS_SKIP_SMUDGE in environment', () => {
-    const {options} = driver.getExecParams(['status'], '/repo');
+  it('does not set GIT_LFS_SKIP_SMUDGE by default (operations need LFS smudge)', () => {
+    const {options} = driver.getExecParams(['checkout', 'abc123'], '/repo');
+    expect(options.env?.GIT_LFS_SKIP_SMUDGE).toBeUndefined();
+  });
+
+  it('sets GIT_LFS_SKIP_SMUDGE when passed via env parameter (read-only commands)', () => {
+    const {options} = driver.getExecParams(['status'], '/repo', undefined, {GIT_LFS_SKIP_SMUDGE: '1'});
     expect(options.env?.GIT_LFS_SKIP_SMUDGE).toBe('1');
   });
 });
