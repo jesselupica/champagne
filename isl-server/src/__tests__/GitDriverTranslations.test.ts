@@ -435,6 +435,16 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(lfsCheckTheirs).toBeLessThan(mergeFile);
     });
 
+    it('resolve --tool internal:union checks for binary content before merge', () => {
+      const result = translate(['resolve', '--tool', 'internal:union', 'image.png']);
+      const script = result.args[1] as string;
+      // Must detect binary content and skip merge-file
+      expect(script).toContain('\\x00');
+      const binaryCheck = script.indexOf('\\x00');
+      const mergeFile = script.indexOf('merge-file');
+      expect(binaryCheck).toBeLessThan(mergeFile);
+    });
+
     it('resolve --tool internal:merge-local without file throws', () => {
       expect(() => translate(['resolve', '--tool', 'internal:merge-local'])).toThrow();
     });

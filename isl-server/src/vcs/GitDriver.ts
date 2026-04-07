@@ -1635,6 +1635,13 @@ export class GitDriver implements VCSDriver {
             '  git add "$FILE"',
             '  exit 0',
             'fi',
+            // Detect binary files (containing null bytes). git merge-file is text-only
+            // and would silently corrupt binary content.
+            'if printf "%s" "$OURS_CONTENT" | grep -qP "\\x00" 2>/dev/null; then',
+            '  echo "$OURS_CONTENT" > "$FILE"',
+            '  git add "$FILE"',
+            '  exit 0',
+            'fi',
             'TMPBASE=$(mktemp -t git-isl-union)',
             'trap \'rm -f "$TMPBASE" "$TMPBASE-ours" "$TMPBASE-base" "$TMPBASE-theirs"\' EXIT',
             'echo "$OURS_CONTENT" > "$TMPBASE-ours"',
