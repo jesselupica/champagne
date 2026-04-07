@@ -1304,6 +1304,48 @@ if (hasGit) {
         await gitHelpers.rebaseAbort(tmpDir);
       });
     });
+
+    describe('Shallow Clone Handling', () => {
+      let shallowDir: string;
+
+      beforeEach(async () => {
+        // Create a "remote" repo with history
+        await gitHelpers.commit(tmpDir, 'first', 'a.txt', 'a');
+        await gitHelpers.commit(tmpDir, 'second', 'b.txt', 'b');
+        await gitHelpers.commit(tmpDir, 'third', 'c.txt', 'c');
+
+        // Clone it shallowly
+        const rawShallowDir = await fs.mkdtemp(path.join(os.tmpdir(), 'champagne-shallow-'));
+        shallowDir = await fs.realpath(rawShallowDir);
+        await execFile('git', ['clone', '--depth=1', tmpDir, shallowDir]);
+      });
+
+      afterEach(async () => {
+        await fs.rm(shallowDir, {recursive: true, force: true});
+      });
+
+      it('fetchCommits works on a shallow clone', async () => {
+        const shallowCtx = {
+          cmd: 'git' as const,
+          cwd: shallowDir,
+          logger: mockLogger,
+          tracker: mockTracker,
+        };
+        const commits = await driver.fetchCommits(shallowCtx, {type: 'none'}, defaultFetchOptions);
+        expect(commits.length).toBeGreaterThanOrEqual(1);
+      });
+
+      it('fetchStatus works on a shallow clone', async () => {
+        const shallowCtx = {
+          cmd: 'git' as const,
+          cwd: shallowDir,
+          logger: mockLogger,
+          tracker: mockTracker,
+        };
+        const status = await driver.fetchStatus(shallowCtx);
+        expect(Array.isArray(status)).toBe(true);
+      });
+    });
   });
 } else {
   describe('Git Driver Integration Tests', () => {
