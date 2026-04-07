@@ -452,7 +452,7 @@ export class GitDriver implements VCSDriver {
     const stdinInput = draftCommits.map(c => c.hash).join('\n') + '\n';
     const batchResult = await this.runCommand(
       ctx,
-      ['diff-tree', '--stdin', '-r', '--name-only'],
+      ['diff-tree', '--stdin', '-r', '--name-only', '--no-renames'],
       {input: stdinInput},
     );
     // Output format: each commit produces a line with its hash, followed by file lines.
@@ -803,6 +803,8 @@ export class GitDriver implements VCSDriver {
       'diff',
       ...args,
       '--no-prefix',
+      '--no-ext-diff',
+      '--no-textconv',
       '--unified=' + String(contextLines),
     ]);
     return result.stdout;
@@ -813,6 +815,7 @@ export class GitDriver implements VCSDriver {
       'diff-tree',
       '--no-commit-id',
       '-r',
+      '--no-renames',
       '--name-status',
       hash,
     ]);
@@ -930,7 +933,7 @@ export class GitDriver implements VCSDriver {
 
       // Use diff against first parent. For merge commits, this shows what the merge brought in.
       // Use -- separator before paths to avoid ambiguity
-      const args = ['diff', '--stat', hash + '^', hash];
+      const args = ['diff', '--stat', '--no-renames', '--no-ext-diff', '--no-textconv', hash + '^', hash];
       if (exclusions.length > 0) {
         args.push('--', '.', ...exclusions);
       }
@@ -940,7 +943,7 @@ export class GitDriver implements VCSDriver {
       // Root commit has no parent; use --root with diff-tree
       try {
         const exclusions = excludeFiles.flatMap(file => [':(exclude)' + file]);
-        const args = ['diff-tree', '--stat', '--root', hash];
+        const args = ['diff-tree', '--stat', '--no-renames', '--root', hash];
         if (exclusions.length > 0) {
           args.push('--', '.', ...exclusions);
         }
@@ -954,10 +957,14 @@ export class GitDriver implements VCSDriver {
 
   async getPendingDiffStats(
     ctx: RepositoryContext,
-    _includeFiles: string[],
+    includeFiles: string[],
   ): Promise<number | undefined> {
     try {
-      const result = await this.runCommand(ctx, ['diff', '--stat']);
+      const args = ['diff', '--stat', '--no-renames', '--no-ext-diff', '--no-textconv'];
+      if (includeFiles.length > 0) {
+        args.push('--', ...includeFiles);
+      }
+      const result = await this.runCommand(ctx, args);
       return this.parseSlocFrom(result.stdout);
     } catch {
       return undefined;
@@ -966,10 +973,14 @@ export class GitDriver implements VCSDriver {
 
   async getPendingAmendDiffStats(
     ctx: RepositoryContext,
-    _includeFiles: string[],
+    includeFiles: string[],
   ): Promise<number | undefined> {
     try {
-      const result = await this.runCommand(ctx, ['diff', '--stat', 'HEAD^']);
+      const args = ['diff', '--stat', '--no-renames', '--no-ext-diff', '--no-textconv', 'HEAD^'];
+      if (includeFiles.length > 0) {
+        args.push('--', ...includeFiles);
+      }
+      const result = await this.runCommand(ctx, args);
       return this.parseSlocFrom(result.stdout);
     } catch {
       return undefined;
