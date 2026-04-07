@@ -924,53 +924,57 @@ export class GitDriver implements VCSDriver {
       return [];
     }
 
+    const stashLines = stashListOutput.split('\n').filter(Boolean);
+
+    // Fetch file info for all stashes in parallel (capped at 5 concurrent)
+    const MAX_CONCURRENT_STASH_SHOW = 5;
     const shelves: ShelvedChange[] = [];
-    for (const line of stashListOutput.split('\n')) {
-      if (!line) {
-        continue;
-      }
-      const [hash, name, dateStr, description] = line.split('\x00');
+    for (let i = 0; i < stashLines.length; i += MAX_CONCURRENT_STASH_SHOW) {
+      const batch = stashLines.slice(i, i + MAX_CONCURRENT_STASH_SHOW);
+      const results = await Promise.all(batch.map(async (line) => {
+        const [hash, name, dateStr, description] = line.split('\x00');
 
-      // Get files for this stash
-      let filesSample: ChangedFile[] = [];
-      let totalFileCount = 0;
-      try {
-        const showResult = await this.runCommand(ctx, [
-          'stash',
-          'show',
-          '--name-status',
+        let filesSample: ChangedFile[] = [];
+        let totalFileCount = 0;
+        try {
+          const showResult = await this.runCommand(ctx, [
+            'stash',
+            'show',
+            '--name-status',
+            name,
+          ]);
+          const fileLines = showResult.stdout.trim().split('\n').filter(Boolean);
+          totalFileCount = fileLines.length;
+          filesSample = fileLines.slice(0, 25).map(fileLine => {
+            const parts = fileLine.split('\t');
+            const statusChar = parts[0].charAt(0);
+            let status: ChangedFileStatus;
+            switch (statusChar) {
+              case 'A':
+                status = 'A';
+                break;
+              case 'D':
+                status = 'R';
+                break;
+              default:
+                status = 'M';
+            }
+            return {path: parts[1] ?? parts[0], status};
+          });
+        } catch {
+          // ignore
+        }
+
+        return {
+          hash,
           name,
-        ]);
-        const fileLines = showResult.stdout.trim().split('\n').filter(Boolean);
-        totalFileCount = fileLines.length;
-        filesSample = fileLines.slice(0, 25).map(fileLine => {
-          const parts = fileLine.split('\t');
-          const statusChar = parts[0].charAt(0);
-          let status: ChangedFileStatus;
-          switch (statusChar) {
-            case 'A':
-              status = 'A';
-              break;
-            case 'D':
-              status = 'R';
-              break;
-            default:
-              status = 'M';
-          }
-          return {path: parts[1] ?? parts[0], status};
-        });
-      } catch {
-        // ignore
-      }
-
-      shelves.push({
-        hash,
-        name,
-        date: new Date(dateStr),
-        filesSample,
-        totalFileCount,
-        description: description ?? '',
-      });
+          date: new Date(dateStr),
+          filesSample,
+          totalFileCount,
+          description: description ?? '',
+        } as ShelvedChange;
+      }));
+      shelves.push(...results);
     }
     return shelves;
   }

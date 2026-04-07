@@ -15,6 +15,7 @@ import {isEjecaError} from './utils';
 
 export const MAX_FETCHED_FILES_PER_COMMIT = 25;
 export const MAX_SIMULTANEOUS_CAT_CALLS = 4;
+export const MAX_SIMULTANEOUS_DIFF_CALLS = 3;
 /** Timeout for non-operation commands. Operations like goto and rebase are expected to take longer,
  * but status, log, cat, etc should typically take <10s. */
 export const READ_COMMAND_TIMEOUT_MS = 60_000;

@@ -69,6 +69,7 @@ import {WatchForChanges} from './WatchForChanges';
 import {parseAlerts} from './alerts';
 import {
   MAX_SIMULTANEOUS_CAT_CALLS,
+  MAX_SIMULTANEOUS_DIFF_CALLS,
   READ_COMMAND_TIMEOUT_MS,
   computeNewConflicts,
   extractRepoInfoFromUrl,
@@ -1261,12 +1262,17 @@ export class Repository {
     throw new Error('Debug info collection is not supported by this VCS driver');
   }
 
+  private diffLimiter = new RateLimiter(MAX_SIMULTANEOUS_DIFF_CALLS, s =>
+    this.initialConnectionContext.logger.info('[diff]', s),
+  );
   public async runDiff(
     ctx: RepositoryContext,
     comparison: Comparison,
     contextLines = 4,
   ): Promise<string> {
-    return this.driver.getDiff(ctx, comparison, contextLines);
+    return this.diffLimiter.enqueueRun(async () => {
+      return this.driver.getDiff(ctx, comparison, contextLines);
+    });
   }
 
   public runCommand(
