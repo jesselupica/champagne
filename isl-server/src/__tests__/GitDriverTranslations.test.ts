@@ -421,6 +421,20 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(script).toContain('cp ');  // copy result back to working tree
     });
 
+    it('resolve --tool internal:union checks all three stages for LFS pointers', () => {
+      const result = translate(['resolve', '--tool', 'internal:union', 'src/large.bin']);
+      const script = result.args[1] as string;
+      // Must check base (:1:) and theirs (:3:) stages for LFS, not just ours (:2:)
+      expect(script).toContain(':1:"$FILE"');
+      expect(script).toContain(':3:"$FILE"');
+      // All three checks must happen before merge-file
+      const lfsCheckBase = script.indexOf(':1:"$FILE"');
+      const lfsCheckTheirs = script.indexOf(':3:"$FILE"');
+      const mergeFile = script.indexOf('merge-file');
+      expect(lfsCheckBase).toBeLessThan(mergeFile);
+      expect(lfsCheckTheirs).toBeLessThan(mergeFile);
+    });
+
     it('resolve --tool internal:merge-local without file throws', () => {
       expect(() => translate(['resolve', '--tool', 'internal:merge-local'])).toThrow();
     });

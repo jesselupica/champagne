@@ -1619,19 +1619,27 @@ export class GitDriver implements VCSDriver {
           const script = [
             'set -e',
             `FILE="${escapedFile}"`,
-            // Check if the file is LFS-tracked by inspecting the "ours" stage for a pointer header.
-            // If so, skip the three-way merge (which would corrupt the pointer) and just keep ours.
+            // Fetch all three conflict stages upfront.
+            // Base and theirs use 2>/dev/null || true because they may not exist in add/add conflicts.
+            'BASE_CONTENT=$(git show :1:"$FILE" 2>/dev/null || true)',
             'OURS_CONTENT=$(git show :2:"$FILE")',
-            'if echo "$OURS_CONTENT" | head -1 | grep -q "^version https://git-lfs"; then',
+            'THEIRS_CONTENT=$(git show :3:"$FILE" 2>/dev/null || true)',
+            // Check ALL three stages for LFS pointer header. If any is LFS, keep ours and exit
+            // to avoid corrupting the pointer with a three-way text merge.
+            'IS_LFS=false',
+            'echo "$BASE_CONTENT" | head -1 | grep -q "^version https://git-lfs" && IS_LFS=true',
+            'echo "$OURS_CONTENT" | head -1 | grep -q "^version https://git-lfs" && IS_LFS=true',
+            'echo "$THEIRS_CONTENT" | head -1 | grep -q "^version https://git-lfs" && IS_LFS=true',
+            'if [ "$IS_LFS" = "true" ]; then',
             '  echo "$OURS_CONTENT" > "$FILE"',
             '  git add "$FILE"',
             '  exit 0',
             'fi',
             'TMPBASE=$(mktemp -t git-isl-union)',
-            'trap \'rm -f "$TMPBASE-ours" "$TMPBASE-base" "$TMPBASE-theirs"\' EXIT',
+            'trap \'rm -f "$TMPBASE" "$TMPBASE-ours" "$TMPBASE-base" "$TMPBASE-theirs"\' EXIT',
             'echo "$OURS_CONTENT" > "$TMPBASE-ours"',
-            'git show :1:"$FILE" > "$TMPBASE-base"',
-            'git show :3:"$FILE" > "$TMPBASE-theirs"',
+            'echo "$BASE_CONTENT" > "$TMPBASE-base"',
+            'echo "$THEIRS_CONTENT" > "$TMPBASE-theirs"',
             'git merge-file --union "$TMPBASE-ours" "$TMPBASE-base" "$TMPBASE-theirs" || true',
             'cp "$TMPBASE-ours" "$FILE"',
             'git add "$FILE"',
