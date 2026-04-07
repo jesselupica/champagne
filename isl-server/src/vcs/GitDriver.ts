@@ -1294,10 +1294,10 @@ export class GitDriver implements VCSDriver {
           `    exit 1`,
           `  fi`,
           `  NEW_TIP=$(git rev-parse HEAD)`,
-          `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
+          `  if [ -n "$ORIG_BRANCH" ]; then git checkout -B "$ORIG_BRANCH" $NEW_TIP; else git checkout --detach $NEW_TIP; fi`,
           `else`,
           // HEAD case: force-update branch pointer to new amended commit
-          `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TARGET && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TARGET; fi`,
+          `  if [ -n "$ORIG_BRANCH" ]; then git checkout -B "$ORIG_BRANCH" $NEW_TARGET; else git checkout --detach $NEW_TARGET; fi`,
           `fi`,
         ].join('\n');
 
@@ -1357,13 +1357,11 @@ export class GitDriver implements VCSDriver {
         `    exit 1`,
         `  fi`,
         `  NEW_TIP=$(git rev-parse HEAD)`,
-        `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_TIP && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_TIP; fi`,
+        `  if [ -n "$ORIG_BRANCH" ]; then git checkout -B "$ORIG_BRANCH" $NEW_TIP; else git checkout --detach $NEW_TIP; fi`,
         `else`,
-        // branch -f needed: if targetRef was a SHA (not "HEAD"), checkout detaches HEAD;
-        // amend creates NEW_HASH in detached state but branch still points at old SHA
-        `  # Force-update branch: if target was a SHA (not "HEAD"), checkout detaches HEAD`,
-        `  # and amend creates NEW_HASH in detached state without moving the branch pointer`,
-        `  if [ -n "$ORIG_BRANCH" ]; then git branch -f "$ORIG_BRANCH" $NEW_HASH && git checkout "$ORIG_BRANCH"; else git checkout --detach $NEW_HASH; fi`,
+        // checkout -B atomically resets the branch to the new commit and checks it out,
+        // avoiding the "cannot force update branch used by worktree" error from branch -f
+        `  if [ -n "$ORIG_BRANCH" ]; then git checkout -B "$ORIG_BRANCH" $NEW_HASH; else git checkout --detach $NEW_HASH; fi`,
         `fi`,
       ].join('\n');
 

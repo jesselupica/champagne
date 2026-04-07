@@ -1428,6 +1428,265 @@ if (hasGit) {
         }
       });
     });
+
+    describe('Shell Script Operations (end-to-end)', () => {
+      /** Run an operation through the full driver pipeline, same as ISL does at runtime. */
+      async function runOp(args: RunnableOperation['args']): Promise<void> {
+        const resolved = driver.normalizeOperationArgs(tmpDir, tmpDir, {
+          args,
+          id: 'test-op',
+          runner: 0 as any,
+          trackEventName: 'test' as any,
+        });
+        const {command, args: execArgs, options} = driver.getExecParams(
+          resolved.args,
+          tmpDir,
+          undefined,
+          resolved.env,
+        );
+        await execFile(command, execArgs, {...options, env: {...process.env, ...options.env}});
+      }
+
+      function mkCtx() {
+        return {
+          cmd: 'git' as const,
+          cwd: tmpDir,
+          logger: mockLogger,
+          tracker: mockTracker,
+        };
+      }
+
+      describe('goto (GotoOperation)', () => {
+        it('goto with clean working tree checks out target commit', async () => {
+          await gitHelpers.commit(tmpDir, 'A', 'a.txt', 'a');
+          const hashA = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'B', 'b.txt', 'b');
+
+          await runOp(['goto', '--rev', hashA]);
+
+          const head = await gitHelpers.getHead(tmpDir);
+          expect(head).toBe(hashA);
+        });
+
+        it('goto with dirty working tree carries changes via stash', async () => {
+          await gitHelpers.commit(tmpDir, 'A', 'a.txt', 'a');
+          const hashA = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'B', 'b.txt', 'b');
+          // Modify a file that exists at both commits so stash pop works cleanly
+          await fs.writeFile(path.join(tmpDir, 'a.txt'), 'modified');
+
+          await runOp(['goto', '--rev', hashA]);
+
+          const head = await gitHelpers.getHead(tmpDir);
+          expect(head).toBe(hashA);
+          const content = await fs.readFile(path.join(tmpDir, 'a.txt'), 'utf-8');
+          expect(content).toBe('modified');
+        });
+      });
+
+      describe('metaedit (AmendMessageOperation)', () => {
+        it('metaedit on HEAD changes commit message and preserves branch', async () => {
+          await gitHelpers.commit(tmpDir, 'original', 'file.txt', 'content');
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'test-branch');
+          // Need a commit on the branch so HEAD is on test-branch
+          await gitHelpers.commit(tmpDir, 'branch commit', 'b.txt', 'b');
+
+          await runOp(['metaedit', '--rev', 'HEAD', '--message', 'updated message']);
+
+          const {stdout} = await execFile('git', ['log', '-1', '--format=%s'], {cwd: tmpDir});
+          expect(stdout.trim()).toBe('updated message');
+          const {stdout: branch} = await execFile('git', ['symbolic-ref', '--short', 'HEAD'], {cwd: tmpDir});
+          expect(branch.trim()).toBe('test-branch');
+        });
+
+        it('metaedit on non-HEAD commit rebases stack', async () => {
+          await gitHelpers.commit(tmpDir, 'base', 'base.txt', 'base');
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'feature');
+          await gitHelpers.commit(tmpDir, 'target', 'target.txt', 'target');
+          const targetHash = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'above', 'above.txt', 'above');
+
+          await runOp(['metaedit', '--rev', targetHash, '--message', 'edited target']);
+
+          const {stdout: branch} = await execFile('git', ['symbolic-ref', '--short', 'HEAD'], {cwd: tmpDir});
+          expect(branch.trim()).toBe('feature');
+          const {stdout: log} = await execFile('git', ['log', '--format=%s', '-3'], {cwd: tmpDir});
+          const messages = log.trim().split('\n');
+          expect(messages).toContain('above');
+          expect(messages).toContain('edited target');
+        });
+      });
+
+      describe('amend --to (AmendToOperation)', () => {
+        it('amend --to HEAD amends current commit with specific file', async () => {
+          await gitHelpers.commit(tmpDir, 'base', 'base.txt', 'base');
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'feature');
+          await gitHelpers.commit(tmpDir, 'target', 'file.txt', 'original');
+          await fs.writeFile(path.join(tmpDir, 'file.txt'), 'amended content');
+
+          await runOp(['amend', '--to', 'HEAD', 'file.txt']);
+
+          const content = await fs.readFile(path.join(tmpDir, 'file.txt'), 'utf-8');
+          expect(content).toBe('amended content');
+          const {stdout: branch} = await execFile('git', ['symbolic-ref', '--short', 'HEAD'], {cwd: tmpDir});
+          expect(branch.trim()).toBe('feature');
+        });
+
+        it('amend --to non-HEAD commit rebases stack', async () => {
+          await gitHelpers.commit(tmpDir, 'base', 'base.txt', 'base');
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'feature');
+          await gitHelpers.commit(tmpDir, 'target', 'target.txt', 'original');
+          const targetHash = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'above', 'above.txt', 'above');
+          await fs.writeFile(path.join(tmpDir, 'target.txt'), 'amended content');
+
+          await runOp(['amend', '--to', targetHash, 'target.txt']);
+
+          const {stdout: branch} = await execFile('git', ['symbolic-ref', '--short', 'HEAD'], {cwd: tmpDir});
+          expect(branch.trim()).toBe('feature');
+          const {stdout: log} = await execFile('git', ['log', '--format=%s', '-3'], {cwd: tmpDir});
+          const messages = log.trim().split('\n');
+          expect(messages).toContain('above');
+          expect(messages).toContain('target');
+        });
+      });
+
+      describe('rebase -s SRC -d DEST (RebaseOperation)', () => {
+        it('rebases a single commit to a new destination', async () => {
+          await gitHelpers.commit(tmpDir, 'base', 'base.txt', 'base');
+          const baseHash = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'main-next', 'main.txt', 'main');
+          const mainNext = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.checkout(tmpDir, baseHash);
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'feature');
+          await gitHelpers.commit(tmpDir, 'feature-commit', 'feat.txt', 'feat');
+          const featHash = await gitHelpers.getHead(tmpDir);
+
+          await runOp(['rebase', '-s', featHash, '-d', mainNext]);
+
+          const commits = await driver.fetchCommits(mkCtx(), {type: 'none'}, defaultFetchOptions);
+          const feat = commits.find(c => c.title === 'feature-commit');
+          expect(feat).toBeDefined();
+          expect(feat!.parents).toContain(mainNext);
+        });
+
+        it('rebases a stack of commits (preserves descendants)', async () => {
+          await gitHelpers.commit(tmpDir, 'base', 'base.txt', 'base');
+          const baseHash = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'main-next', 'main.txt', 'main');
+          const mainNext = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.checkout(tmpDir, baseHash);
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'feature');
+          await gitHelpers.commit(tmpDir, 'stack-A', 'sa.txt', 'sa');
+          const stackA = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'stack-B', 'sb.txt', 'sb');
+
+          await runOp(['rebase', '-s', stackA, '-d', mainNext]);
+
+          const commits = await driver.fetchCommits(mkCtx(), {type: 'none'}, defaultFetchOptions);
+          const rebasedA = commits.find(c => c.title === 'stack-A');
+          const rebasedB = commits.find(c => c.title === 'stack-B');
+          expect(rebasedA).toBeDefined();
+          expect(rebasedB).toBeDefined();
+          expect(rebasedA!.parents).toContain(mainNext);
+          expect(rebasedB!.parents).toContain(rebasedA!.hash);
+        });
+      });
+
+      describe('continue (ContinueOperation)', () => {
+        it('continue resolves a rebase conflict and finishes rebase', async () => {
+          await gitHelpers.commit(tmpDir, 'base', 'file.txt', 'base content');
+          const baseHash = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'change-A', 'file.txt', 'content from A');
+          const hashA = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.checkout(tmpDir, baseHash);
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'conflict-branch');
+          await gitHelpers.commit(tmpDir, 'change-B', 'file.txt', 'content from B');
+
+          try { await gitHelpers.rebase(tmpDir, hashA); } catch { /* expected conflict */ }
+
+          await fs.writeFile(path.join(tmpDir, 'file.txt'), 'resolved content');
+          await execFile('git', ['add', 'file.txt'], {cwd: tmpDir});
+
+          await runOp(['continue']);
+
+          const conflicts = await driver.checkMergeConflicts(mkCtx(), undefined);
+          expect(conflicts).toBeUndefined();
+          const head = await gitHelpers.getHead(tmpDir);
+          const {stdout} = await execFile('git', ['log', '--format=%P', '-1', head], {cwd: tmpDir});
+          expect(stdout.trim()).toBe(hashA);
+        });
+      });
+
+      describe('rebase --abort (AbortOperation)', () => {
+        it('abort returns to pre-rebase state', async () => {
+          await gitHelpers.commit(tmpDir, 'base', 'file.txt', 'base content');
+          const baseHash = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'change-A', 'file.txt', 'content from A');
+          const hashA = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.checkout(tmpDir, baseHash);
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'abort-branch');
+          await gitHelpers.commit(tmpDir, 'change-B', 'file.txt', 'content from B');
+          const hashB = await gitHelpers.getHead(tmpDir);
+
+          try { await gitHelpers.rebase(tmpDir, hashA); } catch { /* expected */ }
+
+          await runOp(['rebase', '--abort']);
+
+          const head = await gitHelpers.getHead(tmpDir);
+          expect(head).toBe(hashB);
+          const conflicts = await driver.checkMergeConflicts(mkCtx(), undefined);
+          expect(conflicts).toBeUndefined();
+        });
+      });
+
+      describe('resolve --tool (conflict resolution)', () => {
+        async function createRebaseConflict(): Promise<{hashA: string}> {
+          await gitHelpers.commit(tmpDir, 'base', 'file.txt', 'line1\nline2\nline3\n');
+          const baseHash = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.commit(tmpDir, 'change-A', 'file.txt', 'line1\nchanged-by-A\nline3\n');
+          const hashA = await gitHelpers.getHead(tmpDir);
+          await gitHelpers.checkout(tmpDir, baseHash);
+          await gitHelpers.createAndCheckoutBranch(tmpDir, 'resolve-test');
+          await gitHelpers.commit(tmpDir, 'change-B', 'file.txt', 'line1\nchanged-by-B\nline3\n');
+          try { await gitHelpers.rebase(tmpDir, hashA); } catch { /* expected */ }
+          return {hashA};
+        }
+
+        it('resolve --tool internal:merge-local keeps ours (destination in rebase)', async () => {
+          await createRebaseConflict();
+          await runOp(['resolve', '--tool', 'internal:merge-local', 'file.txt']);
+          const content = await fs.readFile(path.join(tmpDir, 'file.txt'), 'utf-8');
+          expect(content).toContain('changed-by-A');
+          expect(content).not.toContain('<<<<');
+        });
+
+        it('resolve --tool internal:merge-other keeps theirs (source in rebase)', async () => {
+          await createRebaseConflict();
+          await runOp(['resolve', '--tool', 'internal:merge-other', 'file.txt']);
+          const content = await fs.readFile(path.join(tmpDir, 'file.txt'), 'utf-8');
+          expect(content).toContain('changed-by-B');
+          expect(content).not.toContain('<<<<');
+        });
+
+        it('resolve --tool internal:union includes both changes', async () => {
+          await createRebaseConflict();
+          await runOp(['resolve', '--tool', 'internal:union', 'file.txt']);
+          const content = await fs.readFile(path.join(tmpDir, 'file.txt'), 'utf-8');
+          expect(content).toContain('changed-by-A');
+          expect(content).toContain('changed-by-B');
+          expect(content).not.toContain('<<<<');
+        });
+
+        it('resolve --mark stages a manually resolved file', async () => {
+          await createRebaseConflict();
+          await fs.writeFile(path.join(tmpDir, 'file.txt'), 'manually resolved\n');
+          await runOp(['resolve', '--mark', 'file.txt']);
+          const {stdout} = await execFile('git', ['status', '--porcelain'], {cwd: tmpDir});
+          expect(stdout).not.toContain('UU');
+        });
+      });
+    });
   });
 } else {
   describe('Git Driver Integration Tests', () => {

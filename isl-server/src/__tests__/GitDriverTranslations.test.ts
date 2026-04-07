@@ -113,13 +113,13 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(result.args[1]).toContain("--author 'Bob <b@c.com>'");
     });
 
-    it('metaedit amending HEAD commit updates branch pointer (branch -f)', () => {
+    it('metaedit amending HEAD commit updates branch pointer (checkout -B)', () => {
       const result = translate(['metaedit', '--rev', 'HEAD', '--message', 'updated msg']);
       expect(result.args[0]).toBe('__shell__');
       const script = result.args[1] as string;
       // When TARGET_SHA == ORIG_TIP (HEAD case), must force-update branch pointer
-      expect(script).toContain('git branch -f "$ORIG_BRANCH" $NEW_HASH');
-      expect(script).toContain('git checkout "$ORIG_BRANCH"');
+      // Uses checkout -B to atomically reset branch and check out (avoids "branch used by worktree" error)
+      expect(script).toContain('git checkout -B "$ORIG_BRANCH" $NEW_HASH');
       expect(script).toContain('git checkout --detach $NEW_HASH');
     });
   });
@@ -634,12 +634,13 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(script).toContain('commit --amend');
     });
 
-    it('amend --to HEAD commit uses git branch -f to update branch pointer', () => {
+    it('amend --to HEAD commit updates branch pointer (checkout -B)', () => {
       const result = translate(['amend', '--to', 'abc123']);
       expect(result.args[0]).toBe('__shell__');
       const script = result.args[1] as string;
       // HEAD case: else branch must force-update the branch pointer
-      expect(script).toContain('git branch -f "$ORIG_BRANCH" $NEW_TARGET');
+      // Uses checkout -B to atomically reset branch and check out (avoids "branch used by worktree" error)
+      expect(script).toContain('git checkout -B "$ORIG_BRANCH" $NEW_TARGET');
       expect(script).toContain('git checkout --detach $NEW_TARGET');
     });
   });
