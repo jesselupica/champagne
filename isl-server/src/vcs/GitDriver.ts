@@ -1741,6 +1741,7 @@ export class GitDriver implements VCSDriver {
     // 4. If there were commits above topHash, rebase them onto the new fold
     // 5. Restore the branch pointer
     const script = [
+      'set -e',
       `ORIG_BRANCH=$(git symbolic-ref --short HEAD 2>/dev/null || true)`,
       `ORIG_TIP=$(git rev-parse HEAD)`,
       `TOP_SHA=$(git rev-parse "${topHash}")`,

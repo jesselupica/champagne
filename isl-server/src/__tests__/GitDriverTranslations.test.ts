@@ -597,6 +597,12 @@ describe('GitDriver.normalizeOperationArgs', () => {
       expect(script).toContain('TOP_SHA');
     });
 
+    it('fold script begins with set -e for fail-fast behavior', () => {
+      const result = translate(['fold', '--exact', 'aaa111::bbb222', '--message', 'merged']);
+      const script = result.args[1] as string;
+      expect(script.trimStart().startsWith('set -e')).toBe(true);
+    });
+
     it('escapes single quotes in the commit message', () => {
       const result = translate(['fold', '--exact', 'aaa111::bbb222', '--message', "it's done"]);
       expect(result.args[1]).toContain("it'\\''s done");
