@@ -746,11 +746,12 @@ export class GitDriver implements VCSDriver {
       }
     }
     const relativePath = root && path.isAbsolute(resolvedFilePath) ? path.relative(root, resolvedFilePath) : resolvedFilePath;
+    const BLAME_TIMEOUT_MS = 300_000; // 5 minutes — blame on large files is slow but shouldn't hang forever
     const result = await this.runCommand(
       ctx,
-      ['blame', '--porcelain', '--no-ignore-revs-file', rev, '--', relativePath],
+      ['blame', '--porcelain', '--no-progress', '--no-ignore-revs-file', rev, '--', relativePath],
       undefined,
-      0, // no timeout
+      BLAME_TIMEOUT_MS,
     );
 
     return this.parseBlameOutput(result.stdout);
