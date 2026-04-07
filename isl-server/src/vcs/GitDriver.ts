@@ -58,6 +58,12 @@ export class GitDriver implements VCSDriver {
   readonly name = 'Git';
   readonly command = 'git';
 
+  // Cache for public commit hashes (trunk commits). Rebuilt when trunk HEAD changes.
+  private cachedPublicHashes: Set<string> | null = null;
+  private cachedPublicHashesTrunkHead: string | null = null;
+  private cachedPublicHashesTimestamp = 0;
+  private static readonly PUBLIC_HASHES_TTL_MS = 60_000; // 1 minute
+
   readonly capabilities: VCSCapabilities = {
     smartlog: false,
     commitPhases: true,
@@ -190,58 +196,8 @@ export class GitDriver implements VCSDriver {
     // "Public" = commits on the trunk branch (main/master). Feature branch commits
     // remain "draft" even if pushed to a remote, matching Sapling's phase semantics.
     // We check origin/<trunk> first (remote truth), then fall back to local <trunk>.
-    const publicHashes = new Set<string>();
-
-    // Detect the default branch dynamically. Try symbolic-ref first (works when
-    // the remote HEAD is set, e.g. after a clone), then fall back to well-known names.
-    const trunkCandidates: string[] = [];
-    try {
-      const symResult = await this.runCommand(ctx, [
-        'symbolic-ref',
-        '--short',
-        'refs/remotes/origin/HEAD',
-      ]);
-      const detectedBranch = symResult.stdout.trim().replace(/^origin\//, '');
-      if (detectedBranch) {
-        trunkCandidates.push(detectedBranch);
-      }
-    } catch {
-      // symbolic-ref not set — fall through to well-known names
-    }
-    // Always include well-known names as fallback (deduped below)
-    for (const name of ['main', 'master']) {
-      if (!trunkCandidates.includes(name)) {
-        trunkCandidates.push(name);
-      }
-    }
-
-    // Limit how many public hashes we load. On large repos, rev-list can return
-    // millions of hashes. We cap it to avoid excessive memory usage — commits
-    // beyond this limit will appear as "draft" but that's acceptable.
-    const MAX_PUBLIC_HASHES = 50_000;
-    for (const trunkBranch of trunkCandidates) {
-      // Try remote trunk first (authoritative for public status)
-      for (const ref of [`origin/${trunkBranch}`, trunkBranch]) {
-        try {
-          const trunkResult = await this.runCommand(ctx, [
-            'rev-list',
-            '--max-count=' + MAX_PUBLIC_HASHES,
-            ref,
-          ]);
-          for (const line of trunkResult.stdout.trim().split('\n')) {
-            if (line) {
-              publicHashes.add(line);
-            }
-          }
-          break; // Found this trunk ref, stop trying alternatives
-        } catch {
-          // Ref doesn't exist, try next
-        }
-      }
-      if (publicHashes.size > 0) {
-        break; // Found trunk branch, stop looking for other names
-      }
-    }
+    // The result is cached and invalidated when trunk HEAD changes or TTL expires.
+    const publicHashes = await this.getPublicHashes(ctx);
 
     // Step 2: Get HEAD hash for isDot marking
     let headHash = '';
@@ -439,6 +395,87 @@ export class GitDriver implements VCSDriver {
     attachStableLocations(commits, stableLocations);
 
     return commits;
+  }
+
+  /**
+   * Get public commit hashes with caching. Invalidated when trunk HEAD changes or TTL expires.
+   */
+  private async getPublicHashes(ctx: RepositoryContext): Promise<Set<string>> {
+    // Check if cache is still valid
+    const now = Date.now();
+    if (
+      this.cachedPublicHashes != null &&
+      now - this.cachedPublicHashesTimestamp < GitDriver.PUBLIC_HASHES_TTL_MS
+    ) {
+      // Quick check: has trunk HEAD changed?
+      try {
+        const headResult = await this.runCommand(ctx, ['rev-parse', 'refs/remotes/origin/HEAD']);
+        const currentHead = headResult.stdout.trim();
+        if (currentHead === this.cachedPublicHashesTrunkHead) {
+          return this.cachedPublicHashes;
+        }
+      } catch {
+        // If we can't check, just use the TTL
+        return this.cachedPublicHashes;
+      }
+    }
+
+    const publicHashes = new Set<string>();
+
+    // Detect the default branch dynamically
+    const trunkCandidates: string[] = [];
+    try {
+      const symResult = await this.runCommand(ctx, [
+        'symbolic-ref',
+        '--short',
+        'refs/remotes/origin/HEAD',
+      ]);
+      const detectedBranch = symResult.stdout.trim().replace(/^origin\//, '');
+      if (detectedBranch) {
+        trunkCandidates.push(detectedBranch);
+      }
+    } catch {
+      // symbolic-ref not set — fall through to well-known names
+    }
+    for (const name of ['main', 'master']) {
+      if (!trunkCandidates.includes(name)) {
+        trunkCandidates.push(name);
+      }
+    }
+
+    const MAX_PUBLIC_HASHES = 50_000;
+    let trunkHead: string | null = null;
+    for (const trunkBranch of trunkCandidates) {
+      for (const ref of [`origin/${trunkBranch}`, trunkBranch]) {
+        try {
+          const trunkResult = await this.runCommand(ctx, [
+            'rev-list',
+            '--max-count=' + MAX_PUBLIC_HASHES,
+            ref,
+          ]);
+          for (const line of trunkResult.stdout.trim().split('\n')) {
+            if (line) {
+              publicHashes.add(line);
+            }
+          }
+          // Capture the HEAD of trunk for cache invalidation
+          trunkHead = trunkResult.stdout.trim().split('\n')[0] ?? null;
+          break;
+        } catch {
+          // Ref doesn't exist, try next
+        }
+      }
+      if (publicHashes.size > 0) {
+        break;
+      }
+    }
+
+    // Update cache
+    this.cachedPublicHashes = publicHashes;
+    this.cachedPublicHashesTrunkHead = trunkHead;
+    this.cachedPublicHashesTimestamp = now;
+
+    return publicHashes;
   }
 
   async populateCommitFileInfo(
