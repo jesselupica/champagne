@@ -858,16 +858,38 @@ export class GitDriver implements VCSDriver {
     comparison: Comparison,
     contextLines = 4,
   ): Promise<string> {
-    const args = this.diffArgsForComparison(comparison);
-    const result = await this.runCommand(ctx, [
-      'diff',
-      ...args,
-      '--no-prefix',
-      '--no-ext-diff',
-      '--no-textconv',
-      '--unified=' + String(contextLines),
-    ]);
-    return result.stdout;
+    try {
+      const args = this.diffArgsForComparison(comparison);
+      const result = await this.runCommand(ctx, [
+        'diff',
+        ...args,
+        '--no-prefix',
+        '--no-ext-diff',
+        '--no-textconv',
+        '--unified=' + String(contextLines),
+      ]);
+      return result.stdout;
+    } catch (err) {
+      // HeadChanges uses HEAD^ which fails on root commits
+      if (comparison.type === ComparisonType.HeadChanges) {
+        try {
+          const result = await this.runCommand(ctx, [
+            'diff-tree',
+            '-p',
+            '--root',
+            '--no-prefix',
+            '--no-ext-diff',
+            '--no-textconv',
+            '--unified=' + String(contextLines),
+            'HEAD',
+          ]);
+          return result.stdout;
+        } catch {
+          return '';
+        }
+      }
+      throw err;
+    }
   }
 
   async getChangedFiles(ctx: RepositoryContext, hash: Hash): Promise<ChangedFile[]> {

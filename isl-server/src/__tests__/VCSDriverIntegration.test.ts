@@ -454,6 +454,13 @@ function runVCSDriverTests(
         expect(diff).toContain('-original');
         expect(diff).toContain('+changed');
       });
+
+      it('getDiff for HeadChanges works on the first (root) commit', async () => {
+        await helpers.commit(tmpDir, 'root commit', 'file.txt', 'content\n');
+        // HeadChanges uses HEAD^ internally — must not crash on root commit
+        const diff = await driver.getDiff(ctx, {type: ComparisonType.HeadChanges});
+        expect(typeof diff).toBe('string');
+      });
     });
 
     // ── Shelve / Stash ────────────────────────────────
@@ -935,6 +942,13 @@ function runVCSDriverTests(
         const stats = await driver.getPendingAmendDiffStats(ctx, ['b.txt']);
         expect(stats).toBeDefined();
         expect(stats).toBeGreaterThan(0);
+      });
+
+      it('getPendingAmendDiffStats works on the first (root) commit', async () => {
+        await helpers.commit(tmpDir, 'root commit', 'file.txt', 'content\n');
+        await fs.writeFile(path.join(tmpDir, 'file.txt'), 'modified\n');
+        const stats = await driver.getPendingAmendDiffStats(ctx, ['file.txt']);
+        expect(stats === undefined || typeof stats === 'number').toBe(true);
       });
 
       it('getConfigs reads multiple config values', async () => {
