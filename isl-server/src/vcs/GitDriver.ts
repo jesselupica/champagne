@@ -490,7 +490,7 @@ export class GitDriver implements VCSDriver {
     const result = await this.runCommand(ctx, [
       'status',
       '--porcelain=v2',
-      '-uall',
+      '-unormal',
     ]);
     const files: ChangedFile[] = [];
     for (const line of result.stdout.split('\n')) {
@@ -575,7 +575,7 @@ export class GitDriver implements VCSDriver {
     // Get conflicting files from status
     const conflictFiles: Array<ChangedFile & {conflictType: ConflictType}> = [];
     try {
-      const statusResult = await this.runCommand(ctx, ['status', '--porcelain=v2', '-uall']);
+      const statusResult = await this.runCommand(ctx, ['status', '--porcelain=v2', '-unormal']);
       for (const line of statusResult.stdout.split('\n')) {
         if (line.startsWith('u ')) {
           // Porcelain v2 unmerged: u <XY> <sub> <m1> <m2> <m3> <mW> <h1> <h2> <h3> <path>
