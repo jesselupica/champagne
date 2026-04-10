@@ -1,5 +1,56 @@
 # Changelog
 
+## 0.1.9
+
+### Apr 10 2026
+
+#### Performance
+- Fix loading hang on large repos: remove `--glob=refs/remotes/origin/` from git log (22x faster with 14K+ remote branches)
+- Only fetch remote branch info for locally checked-out branches and trunk, instead of all 14K+ remote refs
+- "Pull Trunk" fetches only the trunk branch instead of all remote refs, and fast-forwards local trunk
+
+#### UI
+- Rename "Pull" button to "Pull Trunk"
+- Active branch (HEAD) keeps primary badge color; all other branch tags use a muted secondary style
+- Remove "Open All Files" button from commit info panel
+- Replace sidebar and tab icons with champagne flute logo (#B28F61)
+- Update browser favicon to champagne flute
+
+#### Diagnostics
+- Log actual git subcommand (e.g., `log`, `rev-list`, `status`) instead of just `--no-optional-locks`
+- Log elapsed time for slow commands (>1s) and fetchCommits step breakdown
+- Include subcommand name and elapsed time in timeout/error messages
+
+## 0.1.6
+
+### Apr 9 2026
+
+#### Performance
+- Parallelize git config lookups to avoid sequential spawns
+- Batch lookupCommits hashes and use `for-each-ref --contains` for faster branch resolution
+- Add diff rate limiter and parallelize stash show calls
+- Detect shallow clones and optimize public hash discovery
+- Cache public hashes with TTL and trunk HEAD invalidation
+- Optimize fetchCommits: replace `--all` with explicit refs and limit `for-each-ref`
+- Add timeout and `--no-progress` to git blame
+- Defer diff-tree file info to unblock initial commit render
+
+#### Bug Fixes
+- Handle root commits in HeadChanges diff and getPendingAmendDiffStats
+- Use git-specific dirstate files in Watchman subscription for Git repos
+- Add `set -e` to fold script for fail-fast behavior
+- Fix LFS pointer corruption in union merge conflict resolution
+- Detect binary files in `internal:union` to prevent silent corruption
+- Check all three conflict stages for LFS pointers in merge
+- Move `GIT_LFS_SKIP_SMUDGE` to read-only commands only, fix shelve/unshelve stash refs
+
+#### Reliability & Security
+- Validate shell-interpolated values to prevent injection in hide/rebase scripts
+- Add maxBuffer (50MB default) to subprocess output
+- Harden diff commands with `--no-renames`, `--no-ext-diff`, `--no-textconv`
+- Replace `-uall` with `-unormal` in git status calls
+- Add `--no-optional-locks` to git command execution
+
 ## 0.1.5
 
 ### Apr 6 2026

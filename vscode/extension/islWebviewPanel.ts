@@ -447,7 +447,7 @@ function populateAndSetISLWebview<W extends vscode.WebviewPanel | vscode.Webview
     panelOrView.iconPath = vscode.Uri.joinPath(
       context.extensionUri,
       'resources',
-      'champagne-favicon-light-green-transparent.svg',
+      'champagne-favicon-colored-transparent.svg',
     );
   }
   panelOrView.webview.html = htmlForWebview({

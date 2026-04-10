@@ -585,6 +585,7 @@ export const Commit = memo(
               }
               stable={commit?.stableCommitMetadata ?? []}
               fullRepoBranch={commit.fullRepoBranch}
+              active={commit.isDot}
             />
             {isPublic ? <CommitDate date={commit.date} /> : null}
             {isNarrow ? commitActions : null}

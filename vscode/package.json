@@ -2,7 +2,7 @@
   "name": "champagne-scm",
   "displayName": "Champagne SCM",
   "description": "A universal, graphical source control interface for Git, Sapling, Graphite, and more",
-  "version": "0.1.5",
+  "version": "0.1.9",
   "publisher": "jesselupica",
   "license": "MIT",
   "engines": {
@@ -135,7 +135,7 @@
         "command": "champagne.open-isl",
         "title": "%champagne.open-isl-command%",
         "category": "%champagne.command-category%",
-        "icon": "resources/champagne-favicon-light-green-transparent.svg"
+        "icon": "resources/champagne-favicon-colored-transparent.svg"
       },
       {
         "command": "champagne.open-file-diff-uncommitted",

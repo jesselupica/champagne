@@ -24,10 +24,10 @@ import './PullButton.css';
 
 const DEFAULT_PULL_BUTTON = {
   id: 'pull',
-  label: <T>Pull</T>,
+  label: <T>Pull Trunk</T>,
   getOperation: () => new PullOperation(),
   isRunning: (op: Operation) => op instanceof PullOperation,
-  tooltip: t('Fetch latest repository and branch information from remote.'),
+  tooltip: t('Fetch and update the trunk branch from remote.'),
   allowWithUncommittedChanges: true,
 };
 const pullButtonChoiceKey = configBackedAtom<string>(
@@ -96,7 +96,7 @@ export function PullButton() {
               fetchStableLocations();
             }}>
             <Icon slot="start" icon={isRunningPull ? 'loading' : 'cloud-download'} />
-            <T>Pull</T>
+            <T>Pull Trunk</T>
           </Button>
         )}
       </div>

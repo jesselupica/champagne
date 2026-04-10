@@ -646,11 +646,13 @@ describe('GitDriver.normalizeOperationArgs', () => {
   });
 
   describe('pull (plain, PullOperation)', () => {
-    it('translates plain pull to fetch origin (not git pull which would merge)', () => {
-      expect(translate(['pull'])).toEqual({
-        args: ['fetch', 'origin'],
-        stdin: undefined,
-      });
+    it('translates plain pull to shell script that fetches trunk and fast-forwards local branch', () => {
+      const result = translate(['pull']);
+      expect(result.args[0]).toBe('__shell__');
+      const script = result.args[1];
+      expect(script).toContain('git fetch origin master');
+      expect(script).toContain('git merge --ff-only "origin/master"');
+      expect(script).toContain('git branch -f "master" "origin/master"');
     });
 
     it('does not affect pull --rev (PullRevOperation still works)', () => {

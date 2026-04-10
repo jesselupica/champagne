@@ -62,6 +62,7 @@ export class GitDriver implements VCSDriver {
   private cachedPublicHashes: Set<string> | null = null;
   private cachedPublicHashesTrunkHead: string | null = null;
   private cachedPublicHashesTimestamp = 0;
+  private detectedTrunkBranch: string = 'master'; // updated by getPublicHashes
   private static readonly PUBLIC_HASHES_TTL_MS = 60_000; // 1 minute
 
   readonly capabilities: VCSCapabilities = {
@@ -190,6 +191,7 @@ export class GitDriver implements VCSDriver {
     _codeReviewSystem: CodeReviewSystem,
     options: FetchCommitsOptions,
   ): Promise<CommitInfo[]> {
+    const fetchStart = Date.now();
     const {maxDraftDays, stableLocations, recommendedBookmarks} = options;
 
     // Step 1: Get the set of public commit hashes.
@@ -198,6 +200,7 @@ export class GitDriver implements VCSDriver {
     // We check origin/<trunk> first (remote truth), then fall back to local <trunk>.
     // The result is cached and invalidated when trunk HEAD changes or TTL expires.
     const publicHashes = await this.getPublicHashes(ctx);
+    ctx.logger.info(`fetchCommits: getPublicHashes returned ${publicHashes.size} hashes in ${Date.now() - fetchStart}ms`);
 
     // Step 2: Get HEAD hash for isDot marking
     let headHash = '';
@@ -210,31 +213,61 @@ export class GitDriver implements VCSDriver {
     }
 
     // Step 3: Build branch maps
+    // Only track local branches and their remote tracking counterparts.
+    // On repos with thousands of remote branches (e.g. one per PR), fetching all
+    // remote refs is noisy and slow. We only care about:
+    //   - Local branches (refs/heads/) — branches the user has checked out or created
+    //   - Their upstream remote counterparts — to show push/pull status
+    //   - The trunk remote branch (origin/main, origin/master) — always relevant
     const localBranches = new Map<string, string>(); // hash -> branch names (NUL-separated)
     const remoteBranches = new Map<string, string[]>(); // hash -> remote branch names
+    const localBranchNames = new Set<string>(); // for matching remote tracking branches
     try {
-      // TODO(audit): --count=2000 silently drops branches in repos with >2000 local branches.
-      // Tradeoff: raise cap vs add warning when truncated vs remove cap (200 bytes/ref is cheap).
+      // First, get local branches with their upstream tracking info
       const refsResult = await this.runCommand(ctx, [
         'for-each-ref',
-        '--count=2000',
-        '--sort=-committerdate',
-        '--format=%(objectname) %(refname)',
+        '--format=%(objectname) %(refname) %(upstream)',
         'refs/heads/',
-        'refs/remotes/',
       ]);
+      const trackedRemoteRefs = new Set<string>(); // remote refnames to look up
       for (const line of refsResult.stdout.trim().split('\n')) {
         if (!line) {
           continue;
         }
-        const spaceIdx = line.indexOf(' ');
-        const hash = line.substring(0, spaceIdx);
-        const refname = line.substring(spaceIdx + 1);
+        const parts = line.split(' ');
+        const hash = parts[0];
+        const refname = parts[1];
+        const upstream = parts[2]; // may be empty
         if (refname.startsWith('refs/heads/')) {
           const branchName = refname.substring('refs/heads/'.length);
+          localBranchNames.add(branchName);
           const existing = localBranches.get(hash);
           localBranches.set(hash, existing ? existing + '\0' + branchName : branchName);
-        } else if (refname.startsWith('refs/remotes/')) {
+          if (upstream && upstream.startsWith('refs/remotes/')) {
+            trackedRemoteRefs.add(upstream);
+          }
+        }
+      }
+
+      // Always include trunk remote branch so its label appears in the UI
+      for (const name of ['main', 'master']) {
+        trackedRemoteRefs.add(`refs/remotes/origin/${name}`);
+      }
+
+      // Now resolve only the tracked remote refs
+      if (trackedRemoteRefs.size > 0) {
+        const remoteRefsResult = await this.runCommand(ctx, [
+          'for-each-ref',
+          '--format=%(objectname) %(refname)',
+          ...Array.from(trackedRemoteRefs),
+        ]);
+        for (const line of remoteRefsResult.stdout.trim().split('\n')) {
+          if (!line) {
+            continue;
+          }
+          const spaceIdx = line.indexOf(' ');
+          const hash = line.substring(0, spaceIdx);
+          const refname = line.substring(spaceIdx + 1);
           const remoteName = refname.substring('refs/remotes/'.length);
           if (remoteName.endsWith('/HEAD')) {
             continue;
@@ -263,7 +296,11 @@ export class GitDriver implements VCSDriver {
       '%b',      // body (everything after first line)
     ].join('%x00') + RECORD_SEP;
 
-    // Build log args: always include HEAD, branches, and any stable/recommended locations.
+    // Build log args: always include HEAD and local branches.
+    // We intentionally do NOT include --glob=refs/remotes/origin/ here because on repos
+    // with thousands of remote branches (e.g. one per PR), git must traverse from every
+    // remote tip, making --topo-order prohibitively slow. Remote branch labels are still
+    // displayed via the for-each-ref data collected in Step 3.
     // Cap at MAX_LOG_COMMITS to avoid RangeError: Invalid string length on very large
     // repos where git log --all output can exceed Node.js's string size limit.
     const MAX_LOG_COMMITS = 10_000;
@@ -271,10 +308,7 @@ export class GitDriver implements VCSDriver {
       'log',
       'HEAD',
       '--glob=refs/heads/',
-      '--glob=refs/remotes/origin/',
       '--format=' + format,
-      // TODO(audit): --topo-order requires full DAG traversal before first output, slow on wide histories.
-      // Alternative: --date-order is incremental but changes graph display ordering.
       '--topo-order',
       '--max-count=' + MAX_LOG_COMMITS,
     ];
@@ -290,10 +324,13 @@ export class GitDriver implements VCSDriver {
     }
 
     let logOutput: string;
+    const logStart = Date.now();
     try {
       const logResult = await this.runCommand(ctx, logArgs);
       logOutput = logResult.stdout;
+      ctx.logger.info(`fetchCommits: git log completed in ${Date.now() - logStart}ms, output ${logOutput.length} bytes`);
     } catch {
+      ctx.logger.info(`fetchCommits: git log failed after ${Date.now() - logStart}ms`);
       return [];
     }
 
@@ -399,6 +436,7 @@ export class GitDriver implements VCSDriver {
 
     attachStableLocations(commits, stableLocations);
 
+    ctx.logger.info(`fetchCommits: returning ${commits.length} commits (${commits.filter(c => c.phase === 'public').length} public, ${commits.filter(c => c.phase === 'draft').length} draft) in ${Date.now() - fetchStart}ms`);
     return commits;
   }
 
@@ -487,6 +525,7 @@ export class GitDriver implements VCSDriver {
         }
       }
       if (publicHashes.size > 0) {
+        this.detectedTrunkBranch = trunkBranch;
         break;
       }
     }
@@ -1152,7 +1191,11 @@ export class GitDriver implements VCSDriver {
       // Repository.ts, which does NOT pass this flag, allowing LFS to work normally.
       {GIT_LFS_SKIP_SMUDGE: '1'},
     );
-    ctx.logger.log('run command: ', ctx.cwd, command, resolvedArgs[0]);
+    // Log the git subcommand (e.g. 'log', 'rev-list', 'status') for debuggability.
+    // resolvedArgs[0] is always '--no-optional-locks'; the subcommand is resolvedArgs[1].
+    const subcommand = resolvedArgs[1] ?? resolvedArgs[0];
+    ctx.logger.log('run command: ', ctx.cwd, command, subcommand);
+    const cmdStart = Date.now();
     const result = ejeca(command, resolvedArgs, resolvedOptions);
 
     let timedOut = false;
@@ -1170,17 +1213,23 @@ export class GitDriver implements VCSDriver {
 
     try {
       const val = await result;
+      const elapsed = Date.now() - cmdStart;
+      if (elapsed > 1000) {
+        ctx.logger.info(`slow command: git ${subcommand} took ${elapsed}ms`);
+      }
       return val;
     } catch (err: unknown) {
+      const elapsed = Date.now() - cmdStart;
       if (isEjecaError(err)) {
         if (err.killed) {
           if (timedOut) {
+            ctx.logger.error(`Timed out after ${elapsed}ms: git ${subcommand}`);
             throw new Error('Timed out');
           }
           throw new Error('Killed');
         }
       }
-      ctx.logger.error(`Error running ${command} ${resolvedArgs[0]}: ${err?.toString()}`);
+      ctx.logger.error(`Error running git ${subcommand} (${elapsed}ms): ${err?.toString()}`);
       throw err;
     } finally {
       clearTimeout(timeoutId);
@@ -1427,10 +1476,22 @@ export class GitDriver implements VCSDriver {
       if (args.includes('--rev')) {
         return this.translatePullRevToGit(args);
       }
-      // Plain pull = fetch only (do not merge into working directory).
-      // Fetch from 'origin' only, not --all, to match Sapling's default-remote semantics
-      // and avoid fetching unexpected data from other configured remotes.
-      return {args: ['fetch', 'origin'], stdin};
+      // Plain pull = fetch trunk and fast-forward the local trunk branch.
+      // Uses a script because `git fetch origin master:master` fails when
+      // master is checked out. The script fetches, then either updates the
+      // branch ref (if not checked out) or merges --ff-only (if checked out).
+      const trunk = this.detectedTrunkBranch;
+      const script = [
+        `set -e`,
+        `git fetch origin ${trunk}`,
+        `CURRENT=$(git symbolic-ref --short HEAD 2>/dev/null || true)`,
+        `if [ "$CURRENT" = "${trunk}" ]; then`,
+        `  git merge --ff-only "origin/${trunk}"`,
+        `else`,
+        `  git branch -f "${trunk}" "origin/${trunk}"`,
+        `fi`,
+      ].join('\n');
+      return {args: ['__shell__', script], stdin};
     }
     if (args[0] === 'bookmark') {
       if (args[1] === '--delete') {

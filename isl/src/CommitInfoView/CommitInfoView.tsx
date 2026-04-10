@@ -426,7 +426,6 @@ export function CommitInfoDetails({commit}: {commit: CommitInfo}) {
                 <OpenComparisonViewButton
                   comparison={{type: ComparisonType.Committed, hash: commit.hash}}
                 />
-                <OpenAllFilesButton commit={commit} />
                 <SplitButton trackerEventName="SplitOpenFromSplitSuggestion" commit={commit} />
               </div>
               <ChangedFilesWithFetching commit={commit} />

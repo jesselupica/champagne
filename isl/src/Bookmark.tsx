@@ -51,6 +51,10 @@ const styles = stylex.create({
     alignItems: 'center',
     gap: spacing.quarter,
   },
+  inactive: {
+    opacity: 0.6,
+    backgroundColor: 'var(--toolbar-hoverBackground, rgba(90, 93, 94, 0.31))',
+  },
   draggableBookmarkTag: {
     cursor: 'grab',
   },
@@ -134,12 +138,14 @@ export function Bookmark({
   fullLength,
   tooltip,
   icon,
+  active,
 }: {
   children: string;
   kind: BookmarkKind;
   fullLength?: boolean;
   tooltip?: string | React.ReactNode;
   icon?: string;
+  active?: boolean;
 }) {
   const bookmark = children;
   const contextMenu = useContextMenu(makeBookmarkContextMenuOptions);
@@ -188,6 +194,7 @@ export function Bookmark({
         isDraggable && styles.draggableBookmarkTag,
         styles.bookmarkTag,
         fullLength === true && styles.fullLength,
+        active === false && styles.inactive,
       ]}>
       {icon && <Icon icon={icon} size="XS" style={{display: 'flex', height: '12px'}} />}
       {bookmark}
@@ -201,11 +208,14 @@ export function AllBookmarksTruncated({
   remote,
   local,
   fullRepoBranch,
+  active,
 }: {
   stable: ReadonlyArray<string | {value: string; description: string; isRecommended?: boolean}>;
   remote: ReadonlyArray<string>;
   local: ReadonlyArray<string>;
   fullRepoBranch?: InternalTypes['FullRepoBranch'] | undefined;
+  /** Whether this commit is the active HEAD commit. Only the active commit's bookmarks get the primary color. */
+  active?: boolean;
 }) {
   const recommendedBookmarks = useAtomValue(recommendedBookmarksAtom);
   const showWarningOnMaster = Internal.shouldCheckRebase?.() ?? false;
@@ -265,7 +275,7 @@ export function AllBookmarksTruncated({
         <FullRepoBranchBookmark branch={fullRepoBranch} />
       )}
       {shownBookmarks.map(({value, kind, tooltip, icon}) => (
-        <Bookmark key={value} kind={kind} tooltip={tooltip} icon={icon}>
+        <Bookmark key={value} kind={kind} tooltip={tooltip} icon={icon} active={active}>
           {value}
         </Bookmark>
       ))}
@@ -274,7 +284,7 @@ export function AllBookmarksTruncated({
           component={() => (
             <Column alignStart>
               {hiddenBookmarks.map(({value, kind, tooltip, icon}) => (
-                <Bookmark key={value} kind={kind} tooltip={tooltip} icon={icon} fullLength>
+                <Bookmark key={value} kind={kind} tooltip={tooltip} icon={icon} fullLength active={active}>
                   {value}
                 </Bookmark>
               ))}
