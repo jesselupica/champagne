@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.10
+
+### Apr 10 2026
+
+#### UI
+- Update champagne flute icon viewBox for better centering and sizing across all contexts (favicon, sidebar, extension icon)
+
 ## 0.1.9
 
 ### Apr 10 2026
